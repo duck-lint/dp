@@ -1,0 +1,73 @@
+import { describe, expect, it } from 'vitest';
+import { columnClues, lineClues, rowClues } from '../src/domain/clues';
+import { choosePuzzle, localDateKey } from '../src/domain/dates';
+import { applyCell, initialGame, redo, undo } from '../src/domain/game-state';
+import { isSolved, makeBoard } from '../src/domain/puzzle';
+import { deriveStatistics } from '../src/domain/statistics';
+import { solvePicross } from '../src/domain/solver';
+describe('picross domain', () => {
+  it('derives clues including empty lines', () => {
+    expect(lineClues([...'0000'])).toEqual([0]);
+    expect(rowClues(['1100', '0000'])).toEqual([[2], [0]]);
+    expect(columnClues(['1100', '0000'])).toEqual([[1], [1], [0], [0]]);
+  });
+  it('transitions cells and supports bounded undo/redo', () => {
+    let s = initialGame(2, 2);
+    s = applyCell(s, 0, 0, 'fill');
+    s = applyCell(s, 0, 1, 'cross');
+    expect(s.board[0]).toEqual(['filled', 'crossed']);
+    s = undo(s);
+    expect(s.board[0]).toEqual(['filled', 'unknown']);
+    s = redo(s);
+    expect(s.board[0]).toEqual(['filled', 'crossed']);
+  });
+  it('compares a board to the authoritative solution', () => {
+    const p = {
+      schemaVersion: 1 as const,
+      id: 'x',
+      sequenceNumber: 1,
+      publishDate: '2026-01-01',
+      width: 2,
+      height: 2,
+      solution: ['10', '01'],
+      reveal: { title: 'x', description: 'x' },
+    };
+    expect(
+      isSolved(p, [
+        ['filled', 'unknown'],
+        ['unknown', 'filled'],
+      ]),
+    ).toBe(true);
+    expect(isSolved(p, makeBoard(2, 2))).toBe(false);
+  });
+  it('chooses only a published puzzle for a local date', () => {
+    const ps = [
+      { publishDate: '2026-08-06', id: 'a' },
+      { publishDate: '2026-08-08', id: 'b' },
+    ];
+    expect(choosePuzzle(ps, '2026-08-07')?.id).toBe('a');
+    expect(choosePuzzle(ps, '2026-08-05')).toBeUndefined();
+  });
+  it('formats the local calendar date without UTC rollover', () => {
+    expect(localDateKey(new Date(2026, 7, 6, 23, 59))).toBe('2026-08-06');
+  });
+  it('derives archive-repaired streaks and statistics', () => {
+    const records = [
+      { puzzleId: 'a', date: '2026-08-06', elapsedMs: 1000 },
+      { puzzleId: 'b', date: '2026-08-08', elapsedMs: 3000 },
+      { puzzleId: 'c', date: '2026-08-07', elapsedMs: 2000 },
+    ];
+    expect(deriveStatistics(records)).toMatchObject({
+      total: 3,
+      currentStreak: 3,
+      bestStreak: 3,
+      averageMs: 2000,
+      fastestMs: 1000,
+    });
+  });
+  it('distinguishes unsolvable, unique, and ambiguous line systems', () => {
+    expect(solvePicross([[2]], [[1], [0]]).count).toBe(0);
+    expect(solvePicross([[1]], [[1], [0]]).count).toBe(1);
+    expect(solvePicross([[1], [1]], [[1], [1]]).count).toBe(2);
+  });
+});
