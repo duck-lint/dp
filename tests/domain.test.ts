@@ -178,9 +178,9 @@ describe('picross domain', () => {
     });
     expect(result.board.join('').split('?')).toHaveLength(17);
     expect(result.board.join('').match(/\?/g)).toHaveLength(16);
-    expect(result.rounds.some((round) => round.board.join('').includes('?'))).toBe(
-      true,
-    );
+    expect(
+      result.rounds.some((round) => round.board.join('').includes('?')),
+    ).toBe(true);
   });
   it('reports raw bitmap structure without aesthetic judgments', () => {
     expect(analyzeBitmap(['100', '000', '001'])).toMatchObject({
