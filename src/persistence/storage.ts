@@ -54,7 +54,7 @@ const hasActionBoards = (
 export const isCompatibleSavedState = (
   value: unknown,
   puzzle: PuzzleDefinition,
-): value is GameState =>
+): boolean =>
   Boolean(
     value &&
     typeof value === 'object' &&
@@ -75,7 +75,7 @@ const reconcilePuzzleState = (
   return {
     ...fallback,
     ...old,
-    board: value.board,
+    board: (value as { board: GameState['board'] }).board,
     history: hasActionBoards(old.history, puzzle) ? old.history : [],
     future: hasActionBoards(old.future, puzzle) ? old.future : [],
     startedAt: isFiniteNumber(old.startedAt) ? old.startedAt : null,
