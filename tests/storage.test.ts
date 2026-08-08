@@ -18,4 +18,26 @@ describe('versioned storage', () => {
       puzzles: {},
     });
   });
+  it('migrates legacy in-progress games to a bounded countdown state', () => {
+    localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({
+        puzzles: {
+          old: {
+            board: [['filled']],
+            tool: 'erase',
+            history: [],
+            future: [],
+            startedAt: 10,
+            elapsedMs: 60_000,
+            completedAt: null,
+          },
+        },
+      }),
+    );
+    const migrated = loadData().puzzles.old;
+    expect(migrated.remainingMs).toBe(34 * 60 * 1000);
+    expect(migrated.tool).toBe('fill');
+    expect(migrated.failedAt).toBeNull();
+  });
 });

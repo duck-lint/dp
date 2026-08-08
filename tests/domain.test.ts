@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { columnClues, lineClues, rowClues } from '../src/domain/clues';
 import { choosePuzzle, localDateKey } from '../src/domain/dates';
-import { applyCell, initialGame, redo, undo } from '../src/domain/game-state';
+import {
+  applyCell,
+  GAME_DURATION_MS,
+  initialGame,
+  redo,
+  undo,
+  WRONG_MARK_PENALTY_MS,
+} from '../src/domain/game-state';
 import { isSolved, makeBoard } from '../src/domain/puzzle';
 import { deriveStatistics } from '../src/domain/statistics';
 import { solvePicross } from '../src/domain/solver';
@@ -20,6 +27,65 @@ describe('picross domain', () => {
     expect(s.board[0]).toEqual(['filled', 'unknown']);
     s = redo(s);
     expect(s.board[0]).toEqual(['filled', 'crossed']);
+  });
+  it('uses direct mark toggles and replaces the opposite mark', () => {
+    const solution = ['10', '01'];
+    let s = initialGame(2, 2);
+    s = applyCell(s, 0, 0, 'fill', solution, 1000);
+    expect(s.board[0][0]).toBe('filled');
+    s = applyCell(s, 0, 0, 'fill', solution, 1001);
+    expect(s.board[0][0]).toBe('unknown');
+    s = applyCell(s, 0, 0, 'cross', solution, 1002);
+    expect(s.board[0][0]).toBe('crossed');
+    s = applyCell(s, 0, 0, 'fill', solution, 1003);
+    expect(s.board[0][0]).toBe('filled');
+  });
+  it('charges wrong marks once, never charges clearing, and clamps at zero', () => {
+    const solution = ['1'];
+    let s = initialGame(1, 1);
+    s = applyCell(s, 0, 0, 'cross', solution, 1000);
+    expect(s.remainingMs).toBe(GAME_DURATION_MS - WRONG_MARK_PENALTY_MS);
+    s = applyCell(s, 0, 0, 'cross', solution, 1000);
+    expect(s.remainingMs).toBe(GAME_DURATION_MS - WRONG_MARK_PENALTY_MS);
+    s = applyCell(s, 0, 0, 'fill', solution, 1000);
+    expect(s.remainingMs).toBe(GAME_DURATION_MS - WRONG_MARK_PENALTY_MS);
+    let exhausted = initialGame(1, 1);
+    exhausted = {
+      ...exhausted,
+      remainingMs: WRONG_MARK_PENALTY_MS,
+      startedAt: 2000,
+    };
+    exhausted = applyCell(exhausted, 0, 0, 'cross', solution, 2000);
+    expect(exhausted.remainingMs).toBe(0);
+    expect(exhausted.failedAt).toBe(2000);
+  });
+  it('does not refund penalties on undo or duplicate them on redo', () => {
+    const solution = ['1'];
+    let s = applyCell(initialGame(1, 1), 0, 0, 'cross', solution, 1000);
+    const charged = s.remainingMs;
+    s = undo(s, 1000);
+    expect(s.remainingMs).toBe(charged);
+    s = redo(s, 1000);
+    expect(s.remainingMs).toBe(charged);
+    expect(s.penaltyMs).toBe(WRONG_MARK_PENALTY_MS);
+  });
+  it('keeps a drag clear operation limited to the mark that started it', () => {
+    let s = applyCell(initialGame(2, 1), 0, 0, 'fill', ['11'], 1000);
+    s = applyCell(s, 0, 1, 'cross', ['11'], 1000);
+    s = applyCell(s, 0, 0, 'erase', ['11'], 1000, 'filled');
+    s = applyCell(s, 0, 1, 'erase', ['11'], 1000, 'filled');
+    expect(s.board[0]).toEqual(['unknown', 'crossed']);
+  });
+  it('starts at 35 minutes and blocks edits after timeout', () => {
+    const initial = initialGame(2, 2);
+    expect(initial.remainingMs).toBe(GAME_DURATION_MS);
+    expect(initial.startedAt).toBeNull();
+    const started = applyCell(initial, 0, 0, 'fill', ['10', '00'], 5000);
+    expect(started.startedAt).toBe(5000);
+    const timedOut = { ...started, startedAt: 5000, remainingMs: 1 };
+    const locked = applyCell(timedOut, 0, 1, 'fill', ['10', '00'], 5002);
+    expect(locked.board[0][1]).toBe('unknown');
+    expect(locked.failedAt).toBe(5002);
   });
   it('compares a board to the authoritative solution', () => {
     const p = {
