@@ -401,6 +401,13 @@ header {
 .archive-row.active {
   background: #eee6f8;
 }
+.archive-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
 .empty {
   text-align: center;
   padding: 4rem 1rem;
