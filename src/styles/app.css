@@ -131,7 +131,15 @@ header {
   overflow: auto;
   padding: 0.65rem;
   border: 1px solid var(--line);
-  background: #fbf6ee;
+  /* Keep the playable surface visually independent from application chrome. */
+  --board-paper: #fbf6ee;
+  --board-ink: #332b2b;
+  --board-grid: #a99b91;
+  --board-grid-major: #5e4f4a;
+  --board-fill-edge: #4e326f99;
+  --board-cross: #8d5a88;
+  color: var(--board-ink);
+  background: var(--board-paper);
   box-shadow:
     inset 0 1px 0 #ffffffaa,
     inset 0 -1px 0 #7b655322;
@@ -177,34 +185,34 @@ header {
   height: var(--cell-size);
   min-height: 0;
   padding: 0;
-  border: 1px solid var(--grid);
+  border: 1px solid var(--board-grid);
   border-radius: 0;
   background: transparent;
-  color: #a879a6;
+  color: var(--board-cross);
   font-size: clamp(1.1rem, 3vw, 1.8rem);
   line-height: 1;
 }
 .cell:hover {
-  border-color: var(--grid);
+  border-color: var(--board-grid);
   background: transparent;
 }
 .cell.filled {
   background: var(--accent);
   color: transparent;
-  box-shadow: inset 0 0 0 1px #4e326f99;
+  box-shadow: inset 0 0 0 1px var(--board-fill-edge);
 }
 .cell.crossed {
-  color: #a879a6;
+  color: var(--board-cross);
   background: transparent;
   font-weight: 500;
 }
 .cell.major-x {
   border-right-width: 3px;
-  border-right-color: var(--grid-major);
+  border-right-color: var(--board-grid-major);
 }
 .cell.major-y {
   border-bottom-width: 3px;
-  border-bottom-color: var(--grid-major);
+  border-bottom-color: var(--board-grid-major);
 }
 .reveal-art .col-clues,
 .reveal-art .row-clues {
@@ -451,6 +459,15 @@ header {
       radial-gradient(circle at top right, #46334d, transparent 36%),
       repeating-linear-gradient(0deg, #fff2 0 1px, transparent 1px 4px), #211d1c;
   }
+  .grid-wrap {
+    /* Dark chrome may surround a physical light puzzle sheet; its ink stays dark. */
+    --board-paper: #fbf6ee;
+    --board-ink: #332b2b;
+    --board-grid: #95877d;
+    --board-grid-major: #574841;
+    --board-fill-edge: #4e326f99;
+    --board-cross: #8d5a88;
+  }
 }
 [data-theme='dark'] {
   color: #eeeaf3;
@@ -461,6 +478,14 @@ header {
   --muted: #c3b5ae;
   --grid: #85736b;
   --grid-major: #d4c0b6;
+}
+[data-theme='dark'] .grid-wrap {
+  --board-paper: #fbf6ee;
+  --board-ink: #332b2b;
+  --board-grid: #95877d;
+  --board-grid-major: #574841;
+  --board-fill-edge: #4e326f99;
+  --board-cross: #8d5a88;
 }
 [data-theme='light'] {
   color: #332b2b;
