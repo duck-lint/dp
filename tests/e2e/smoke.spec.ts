@@ -264,3 +264,93 @@ test('does not replay the result for an already-completed persisted puzzle', asy
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'View result' })).toBeVisible();
 });
+
+test('resets all gameplay progress while preserving the theme preference', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.addInitScript((board) => {
+    window.localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({
+        puzzles: {
+          'p-2026-08-08-r2': {
+            board,
+            tool: 'fill',
+            history: [],
+            future: [],
+            startedAt: 1,
+            remainingMs: 1_000_000,
+            penaltyMs: 0,
+            elapsedMs: 1_100_000,
+            completedAt: 2,
+            failedAt: null,
+          },
+        },
+        completions: [
+          { puzzleId: 'p-2026-08-08-r2', date: '2026-08-08', elapsedMs: 1 },
+        ],
+        theme: 'dark',
+      }),
+    );
+  }, solvedBoard(null));
+  await page.goto('/');
+  page.once('dialog', (dialog) => {
+    expect(dialog.message()).toContain(
+      'saved progress, solved history, and streak data',
+    );
+    void dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Reset all progress' }).click();
+  await expect(page.getByTestId('cell-0-0')).toHaveAccessibleName(/unknown/);
+  await expect(
+    page.getByText('All local progress has been reset.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await expect(page.getByText(/Unsolved/).first()).toBeVisible();
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('daily-picross:v1') ?? '{}'),
+  );
+  expect(saved.completions).toEqual([]);
+  expect(saved.theme).toBe('dark');
+});
+
+test('provides a development-only current-puzzle replay reset', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.addInitScript((board) => {
+    window.localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({
+        puzzles: {
+          'p-2026-08-08-r2': {
+            board,
+            tool: 'fill',
+            history: [],
+            future: [],
+            startedAt: 1,
+            remainingMs: 1_000_000,
+            penaltyMs: 0,
+            elapsedMs: 1_100_000,
+            completedAt: 2,
+            failedAt: null,
+          },
+        },
+        completions: [
+          { puzzleId: 'p-2026-08-08-r2', date: '2026-08-08', elapsedMs: 1 },
+        ],
+        theme: 'system',
+      }),
+    );
+  }, solvedBoard(null));
+  await page.goto('/');
+  await expect(
+    page.getByRole('button', { name: 'Replay current' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Replay current' }).click();
+  await expect(page.getByTestId('cell-0-0')).toHaveAccessibleName(/unknown/);
+  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(
+    0,
+  );
+});
