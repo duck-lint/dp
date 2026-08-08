@@ -148,11 +148,15 @@ test('shows the solved art before the delayed result and supports dismissal/reop
 
   await page.getByTestId('cell-1-6').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(
+    0,
+  );
   await expect(page.locator('.reveal-art .cell.filled')).toHaveCount(92);
   await page.clock.fastForward(1799);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(
+    0,
+  );
   await page.clock.fastForward(1);
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCSS('opacity', '1');
@@ -160,15 +164,21 @@ test('shows the solved art before the delayed result and supports dismissal/reop
     page.getByRole('button', { name: 'Close completion result' }),
   ).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Share result' })).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'Share result' }),
+  ).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'View archive' })).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'View archive' }),
+  ).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(
     page.getByRole('button', { name: 'Close completion result' }),
   ).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  await expect(page.getByRole('button', { name: 'View archive' })).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'View archive' }),
+  ).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'View result' })).toBeFocused();
