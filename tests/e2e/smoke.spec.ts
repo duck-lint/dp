@@ -50,4 +50,3 @@ test('rejects an incompatible persisted board before rendering the game', async 
   await expect(page.getByTestId(/^cell-/)).toHaveCount(225);
   expect(runtimeErrors).toEqual([]);
 });
-ac2d9ed38f938339b2fc56eba1875603899a7f11
