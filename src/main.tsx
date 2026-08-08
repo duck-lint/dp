@@ -34,7 +34,7 @@ const cycleTheme = (theme: SavedData['theme']): SavedData['theme'] =>
   theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system';
 
 function App() {
-  const [data, setData] = useState<SavedData>(() => loadData());
+  const [data, setData] = useState<SavedData>(() => loadData(allPuzzles));
   const [selected, setSelected] = useState<PuzzleDefinition | undefined>(
     current,
   );
