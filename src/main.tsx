@@ -275,6 +275,24 @@ function App() {
     setView('game');
     setNotice('All local progress has been reset.');
   };
+  const replayCurrent = () => {
+    if (!selected) return;
+    setData((previous) => {
+      const next = {
+        ...previous,
+        puzzles: { ...previous.puzzles, [selected.id]: empty(selected) },
+        completions: previous.completions.filter(
+          (completion) => completion.puzzleId !== selected.id,
+        ),
+      };
+      saveData(next);
+      return next;
+    });
+    setPendingCompletionId(null);
+    setCompletionPhase('hidden');
+    setResultEntering(false);
+    setNotice('Current puzzle replay reset.');
+  };
 
   if (!selected)
     return (
@@ -287,7 +305,6 @@ function App() {
             saveData(next);
           }}
           onArchive={() => setView('archive')}
-          onResetAll={resetAllProgress}
         />
         <section className="empty">
           <h1>No puzzle published for this date</h1>
@@ -301,6 +318,7 @@ function App() {
             onSelect={setSelected}
             onClose={() => setView('game')}
             data={data}
+            onResetAll={resetAllProgress}
           />
         )}
       </main>
@@ -316,7 +334,6 @@ function App() {
           saveData(next);
         }}
         onArchive={() => setView('archive')}
-        onResetAll={resetAllProgress}
       />
       {view === 'archive' ? (
         <Archive
@@ -328,6 +345,7 @@ function App() {
           }}
           onClose={() => setView('game')}
           data={data}
+          onResetAll={resetAllProgress}
         />
       ) : (
         <>
@@ -357,13 +375,7 @@ function App() {
             onUndo={() => update((s) => undo(s))}
             onRedo={() => update((s) => redo(s))}
             onReset={reset}
-            onReplay={() => {
-              update(() => empty(selected));
-              setPendingCompletionId(null);
-              setCompletionPhase('hidden');
-              setResultEntering(false);
-              setNotice('Current puzzle replay reset.');
-            }}
+            onReplay={replayCurrent}
           />
           {state?.penaltyMs !== undefined &&
             state.penaltyMs > 0 &&
@@ -487,12 +499,10 @@ function App() {
 function Header({
   onArchive,
   onTheme,
-  onResetAll,
   theme,
 }: {
   onArchive: () => void;
   onTheme: () => void;
-  onResetAll: () => void;
   theme: SavedData['theme'];
 }) {
   return (
@@ -510,9 +520,6 @@ function Header({
         </button>
         <button className="header-button" onClick={onArchive}>
           Archive
-        </button>
-        <button className="header-button" onClick={onResetAll}>
-          Reset all progress
         </button>
       </div>
     </header>
@@ -763,12 +770,14 @@ function Archive({
   onSelect,
   onClose,
   data,
+  onResetAll,
 }: {
   puzzles: PuzzleDefinition[];
   selected: PuzzleDefinition | undefined;
   onSelect: (p: PuzzleDefinition) => void;
   onClose: () => void;
   data: SavedData;
+  onResetAll: () => void;
 }) {
   return (
     <section className="archive">
@@ -803,6 +812,11 @@ function Archive({
       <p className="muted">
         Future puzzles are kept off the board until their publication date.
       </p>
+      <div className="archive-actions">
+        <button className="secondary" onClick={onResetAll}>
+          Reset all progress
+        </button>
+      </div>
     </section>
   );
 }
