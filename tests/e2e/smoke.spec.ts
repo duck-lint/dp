@@ -340,7 +340,7 @@ test('provides a development-only current-puzzle replay reset', async ({
         },
         completions: [
           { puzzleId: 'p-2026-08-08-r2', date: '2026-08-08', elapsedMs: 1 },
-          { puzzleId: 'p-2026-08-07-r1', date: '2026-08-07', elapsedMs: 2 },
+          { puzzleId: 'p-2026-08-07-r2', date: '2026-08-07', elapsedMs: 2 },
         ],
         theme: 'system',
       }),
@@ -359,7 +359,7 @@ test('provides a development-only current-puzzle replay reset', async ({
     JSON.parse(localStorage.getItem('daily-picross:v1') ?? '{}'),
   );
   expect(saved.completions).toEqual([
-    { puzzleId: 'p-2026-08-07-r1', date: '2026-08-07', elapsedMs: 2 },
+    { puzzleId: 'p-2026-08-07-r2', date: '2026-08-07', elapsedMs: 2 },
   ]);
   await page.getByRole('button', { name: 'Archive' }).click();
   await expect(page.getByText(/Unsolved/).first()).toBeVisible();
