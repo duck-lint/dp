@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { columnClues, rowClues } from './domain/clues';
 import { localDateKey, formatDate } from './domain/dates';
@@ -41,7 +47,16 @@ function App() {
   const [view, setView] = useState<'game' | 'archive'>('game');
   const [notice, setNotice] = useState('');
   const [now, setNow] = useState(Date.now());
-  const [revealArt, setRevealArt] = useState(false);
+  const [completionPhase, setCompletionPhase] = useState<
+    'hidden' | 'delayed' | 'open'
+  >('hidden');
+  const [pendingCompletionId, setPendingCompletionId] = useState<string | null>(
+    null,
+  );
+  const [resultEntering, setResultEntering] = useState(false);
+  const completionTimer = useRef<number | null>(null);
+  const completionCloseRef = useRef<HTMLButtonElement>(null);
+  const resultLinkRef = useRef<HTMLButtonElement>(null);
   const state = selected
     ? (data.puzzles[selected.id] ?? empty(selected))
     : null;
@@ -57,13 +72,48 @@ function App() {
     [data.completions],
   );
 
+  // The celebration is a transient presentation event, not a projection of
+  // persistent completion. Navigation and puzzle changes cancel it entirely.
   useEffect(() => {
-    setRevealArt(false);
-    if (completed) {
-      const id = window.setTimeout(() => setRevealArt(true), 450);
-      return () => window.clearTimeout(id);
-    }
-  }, [completed, selected?.id]);
+    return () => {
+      if (completionTimer.current !== null) {
+        window.clearTimeout(completionTimer.current);
+        completionTimer.current = null;
+      }
+      setPendingCompletionId(null);
+      setCompletionPhase('hidden');
+      setResultEntering(false);
+    };
+  }, [selected?.id, view]);
+
+  useEffect(() => {
+    if (!selected || view !== 'game' || pendingCompletionId !== selected.id)
+      return;
+    setCompletionPhase('delayed');
+    completionTimer.current = window.setTimeout(() => {
+      setCompletionPhase('open');
+      setPendingCompletionId(null);
+      window.requestAnimationFrame(() => setResultEntering(true));
+    }, 1800);
+    return () => {
+      if (completionTimer.current !== null) {
+        window.clearTimeout(completionTimer.current);
+        completionTimer.current = null;
+      }
+    };
+  }, [pendingCompletionId, selected?.id, view]);
+
+  useEffect(() => {
+    if (completionPhase !== 'open') return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setCompletionPhase('hidden');
+        setResultEntering(false);
+      }
+    };
+    document.addEventListener('keydown', dismiss);
+    return () => document.removeEventListener('keydown', dismiss);
+  }, [completionPhase]);
 
   useEffect(() => {
     if (!state?.startedAt || state.completedAt || state.failedAt) return;
@@ -92,7 +142,7 @@ function App() {
     }
   }, [now, remainingMs, selected?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selected || !state || !completed || state.completedAt || timedOut)
       return;
     const finalState = checkpointTimer(state, Date.now());
@@ -111,8 +161,21 @@ function App() {
     };
     setData(next);
     saveData(next);
+    setPendingCompletionId(selected.id);
+    setCompletionPhase('delayed');
     setNotice('Puzzle complete! Your result and streak have been saved.');
   }, [completed, selected?.id, timedOut]);
+
+  useEffect(() => {
+    if (completionPhase !== 'open' || !resultEntering) return;
+    completionCloseRef.current?.focus();
+  }, [completionPhase, resultEntering]);
+
+  const closeCompletion = () => {
+    setCompletionPhase('hidden');
+    setResultEntering(false);
+    window.requestAnimationFrame(() => resultLinkRef.current?.focus());
+  };
 
   useEffect(() => {
     if (
@@ -190,7 +253,9 @@ function App() {
     )
       return;
     update(() => empty(selected));
-    setRevealArt(false);
+    setPendingCompletionId(null);
+    setCompletionPhase('hidden');
+    setResultEntering(false);
     setNotice('Puzzle reset to 35:00.');
   };
 
@@ -268,7 +333,7 @@ function App() {
           <Game
             puzzle={selected}
             state={state!}
-            revealArt={revealArt}
+            revealArt={completed}
             onPaint={paint}
             onUndo={() => update((s) => undo(s))}
             onRedo={() => update((s) => redo(s))}
@@ -278,13 +343,48 @@ function App() {
             state.penaltyMs > 0 &&
             !completed &&
             !timedOut && <PenaltyBadge key={state.penaltyMs} />}
-          {completed && (
+          {completed && completionPhase === 'open' && (
             <section
-              className="completion"
+              className={`completion ${resultEntering ? 'is-visible' : ''}`}
               role="dialog"
               aria-labelledby="complete-title"
+              aria-modal="true"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  closeCompletion();
+                  return;
+                }
+                if (event.key !== 'Tab') return;
+                const focusable = Array.from(
+                  event.currentTarget.querySelectorAll<HTMLElement>(
+                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                  ),
+                );
+                if (!focusable.length) {
+                  event.preventDefault();
+                  return;
+                }
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus();
+                }
+              }}
             >
               <div>
+                <button
+                  ref={completionCloseRef}
+                  className="completion-close"
+                  aria-label="Close completion result"
+                  onClick={closeCompletion}
+                >
+                  ×
+                </button>
                 <p className="eyebrow">Solved</p>
                 <h2 id="complete-title">{selected.reveal.title}</h2>
                 <p>{selected.reveal.description}</p>
@@ -308,6 +408,22 @@ function App() {
               </div>
             </section>
           )}
+          {completed &&
+            completionPhase === 'hidden' &&
+            pendingCompletionId !== selected.id && (
+              <div className="result-link-wrap">
+                <button
+                  ref={resultLinkRef}
+                  className="secondary"
+                  onClick={() => {
+                    setCompletionPhase('open');
+                    setResultEntering(true);
+                  }}
+                >
+                  View result
+                </button>
+              </div>
+            )}
           {timedOut && !completed && (
             <section className="result-state" role="alert">
               <p className="eyebrow">Time expired</p>
@@ -528,7 +644,13 @@ function Game({
         </button>
         <button onClick={onReset}>Reset</button>
       </div>
-      <div className="grid-wrap">
+      <div
+        className="grid-wrap"
+        onContextMenuCapture={(event) => event.preventDefault()}
+        onAuxClickCapture={(event) => {
+          if (event.button === 2) event.preventDefault();
+        }}
+      >
         <div
           className="picross"
           style={{ '--cols': puzzle.width } as React.CSSProperties}
