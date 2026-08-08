@@ -295,6 +295,7 @@ test('resets all gameplay progress while preserving the theme preference', async
     );
   }, solvedBoard(null));
   await page.goto('/');
+  await page.getByRole('button', { name: 'Archive' }).click();
   page.once('dialog', (dialog) => {
     expect(dialog.message()).toContain(
       'saved progress, solved history, and streak data',
@@ -339,6 +340,7 @@ test('provides a development-only current-puzzle replay reset', async ({
         },
         completions: [
           { puzzleId: 'p-2026-08-08-r2', date: '2026-08-08', elapsedMs: 1 },
+          { puzzleId: 'p-2026-08-07-r1', date: '2026-08-07', elapsedMs: 2 },
         ],
         theme: 'system',
       }),
@@ -353,4 +355,37 @@ test('provides a development-only current-puzzle replay reset', async ({
   await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(
     0,
   );
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('daily-picross:v1') ?? '{}'),
+  );
+  expect(saved.completions).toEqual([
+    { puzzleId: 'p-2026-08-07-r1', date: '2026-08-07', elapsedMs: 2 },
+  ]);
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await expect(page.getByText(/Unsolved/).first()).toBeVisible();
+  await expect(page.getByText(/Solved/).first()).toBeVisible();
+});
+
+test('keeps primary navigation and reset access usable on a narrow viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+
+  const pageWidth = await page.evaluate(
+    () => document.documentElement.scrollWidth,
+  );
+  expect(pageWidth).toBeLessThanOrEqual(360);
+  await expect(page.getByText(/Daily Picross/).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await expect(page.getByRole('heading', { name: 'Archive' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Reset all progress' }),
+  ).toBeVisible();
+  const archivePageWidth = await page.evaluate(
+    () => document.documentElement.scrollWidth,
+  );
+  expect(archivePageWidth).toBeLessThanOrEqual(360);
 });
