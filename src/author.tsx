@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { analyzeBitmap, type PropagationRound } from './domain/puzzle-analysis';
 import type { PuzzleDefinition } from './domain/puzzle';
@@ -15,12 +15,16 @@ const initialMeta = (p?: PuzzleDefinition) => ({
   title: p?.reveal.title ?? '',
   description: p?.reveal.description ?? '',
 });
+type GestureMode = 'fill' | 'erase';
 
 function Author() {
   const [solution, setSolution] = useState(blank);
   const [meta, setMeta] = useState(initialMeta);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const gesture = useRef<{ pointerId: number; mode: GestureMode } | null>(
+    null,
+  );
   const analysis = useMemo(() => analyzeBitmap(solution), [solution]);
   const changedFromSource = Boolean(
     sourceId &&
@@ -51,6 +55,23 @@ function Author() {
           : row,
       ),
     );
+  const endGesture = (pointerId?: number) => {
+    if (pointerId === undefined || gesture.current?.pointerId === pointerId)
+      gesture.current = null;
+  };
+  const applyGesture = (y: number, x: number, pointerId: number) => {
+    if (gesture.current?.pointerId === pointerId)
+      setPixel(y, x, gesture.current.mode === 'fill');
+  };
+  useEffect(() => {
+    const end = (event: PointerEvent) => endGesture(event.pointerId);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    return () => {
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+  }, []);
   const load = (p?: PuzzleDefinition) => {
     setSolution(p ? [...p.solution] : blank());
     setMeta(initialMeta(p));
@@ -67,10 +88,11 @@ function Author() {
       );
     }
   };
-  const candidate = {
+  const candidate: PuzzleDefinition = {
     schemaVersion: 1 as const,
-    ...meta,
+    id: meta.id,
     sequenceNumber: Number(meta.sequenceNumber),
+    publishDate: meta.publishDate,
     width: SIZE,
     height: SIZE,
     solution,
@@ -108,26 +130,48 @@ function Author() {
         <section>
           <h2>Bitmap editor</h2>
           <p className="muted">
-            Left click or drag to fill. Right click or drag to erase.
+            Click or drag to fill/erase from the starting cell. Right click or
+            drag always erases.
           </p>
           <div
             className="author-editor"
             onContextMenu={(e) => e.preventDefault()}
+            onPointerMove={(e) => {
+              const target = (e.target as HTMLElement).closest(
+                'button[data-row][data-column]',
+              );
+              if (target)
+                applyGesture(
+                  Number(target.getAttribute('data-row')),
+                  Number(target.getAttribute('data-column')),
+                  e.pointerId,
+                );
+            }}
+            onPointerUp={(e) => endGesture(e.pointerId)}
+            onPointerCancel={(e) => endGesture(e.pointerId)}
+            onLostPointerCapture={(e) => endGesture(e.pointerId)}
+            onPointerLeave={() => endGesture()}
           >
             {solution.map((row, y) =>
               [...row].map((cell, x) => (
                 <button
                   key={`${y}-${x}`}
+                  data-row={y}
+                  data-column={x}
                   aria-label={`row ${y + 1}, column ${x + 1}, ${cell === '1' ? 'filled' : 'empty'}`}
                   className={cell === '1' ? 'filled' : ''}
                   onPointerDown={(e) => {
                     e.preventDefault();
-                    setPixel(y, x, e.button !== 2);
+                    gesture.current = {
+                      pointerId: e.pointerId,
+                      mode: e.button === 2 || cell === '1' ? 'erase' : 'fill',
+                    };
+                    applyGesture(y, x, e.pointerId);
                   }}
-                  onPointerEnter={(e) => {
-                    if (e.buttons === 1 || e.buttons === 2)
-                      setPixel(y, x, e.buttons === 1);
-                  }}
+                  onPointerMove={(e) => applyGesture(y, x, e.pointerId)}
+                  onPointerUp={(e) => endGesture(e.pointerId)}
+                  onPointerCancel={(e) => endGesture(e.pointerId)}
+                  onLostPointerCapture={(e) => endGesture(e.pointerId)}
                 />
               )),
             )}
