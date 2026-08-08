@@ -411,19 +411,19 @@ function App() {
           {completed &&
             completionPhase === 'hidden' &&
             pendingCompletionId !== selected.id && (
-            <div className="result-link-wrap">
-              <button
-                ref={resultLinkRef}
-                className="secondary"
-                onClick={() => {
-                  setCompletionPhase('open');
-                  setResultEntering(true);
-                }}
-              >
-                View result
-              </button>
-            </div>
-          )}
+              <div className="result-link-wrap">
+                <button
+                  ref={resultLinkRef}
+                  className="secondary"
+                  onClick={() => {
+                    setCompletionPhase('open');
+                    setResultEntering(true);
+                  }}
+                >
+                  View result
+                </button>
+              </div>
+            )}
           {timedOut && !completed && (
             <section className="result-state" role="alert">
               <p className="eyebrow">Time expired</p>
