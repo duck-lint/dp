@@ -1,13 +1,14 @@
 :root {
   font-family: ui-rounded, system-ui, sans-serif;
-  color: #292333;
-  background: #fffaf5;
+  color: #332b2b;
+  background: #f6efe5;
   --accent: #7652a6;
-  --ink: #292333;
-  --muted: #766d7e;
-  --paper: #fff;
-  --line: #d8d0df;
-  --grid: #cfc4d9;
+  --ink: #332b2b;
+  --muted: #706365;
+  --paper: #fffdf8;
+  --line: #d4c8bc;
+  --grid: #a99b91;
+  --grid-major: #5e4f4a;
 }
 * {
   box-sizing: border-box;
@@ -16,7 +17,9 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at top right, #f0e8fb, transparent 36%), var(--paper);
+    radial-gradient(circle at top right, #eee3f4, transparent 36%),
+    repeating-linear-gradient(0deg, #5d463308 0 1px, transparent 1px 4px),
+    #f6efe5;
 }
 button {
   font: inherit;
@@ -99,10 +102,12 @@ header {
   max-width: 760px;
   margin: 0 auto;
   background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 20px;
+  border: 2px solid #b8a99d;
+  border-radius: 14px;
   padding: clamp(0.8rem, 2vw, 1.5rem);
-  box-shadow: 0 12px 40px #33204b10;
+  box-shadow:
+    0 4px 0 #8b776b22,
+    0 14px 30px #5b42301c;
 }
 .toolbar {
   display: flex;
@@ -124,7 +129,20 @@ header {
 }
 .grid-wrap {
   overflow: auto;
-  padding: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  /* Keep the playable surface visually independent from application chrome. */
+  --board-paper: #fbf6ee;
+  --board-ink: #332b2b;
+  --board-grid: #a99b91;
+  --board-grid-major: #5e4f4a;
+  --board-fill-edge: #4e326f99;
+  --board-cross: #8d5a88;
+  color: var(--board-ink);
+  background: var(--board-paper);
+  box-shadow:
+    inset 0 1px 0 #ffffffaa,
+    inset 0 -1px 0 #7b655322;
 }
 .picross {
   display: grid;
@@ -167,34 +185,34 @@ header {
   height: var(--cell-size);
   min-height: 0;
   padding: 0;
-  border: 0 solid var(--grid);
-  border-width: 1px 1px 1px 0;
+  border: 1px solid var(--board-grid);
   border-radius: 0;
   background: transparent;
-  color: #a879a6;
+  color: var(--board-cross);
   font-size: clamp(1.1rem, 3vw, 1.8rem);
   line-height: 1;
 }
 .cell:hover {
-  border-color: var(--grid);
+  border-color: var(--board-grid);
   background: transparent;
 }
 .cell.filled {
   background: var(--accent);
   color: transparent;
+  box-shadow: inset 0 0 0 1px var(--board-fill-edge);
 }
 .cell.crossed {
-  color: #a879a6;
+  color: var(--board-cross);
   background: transparent;
   font-weight: 500;
 }
 .cell.major-x {
-  border-right-width: 2px;
-  border-right-color: var(--accent);
+  border-right-width: 3px;
+  border-right-color: var(--board-grid-major);
 }
 .cell.major-y {
-  border-bottom-width: 2px;
-  border-bottom-color: var(--accent);
+  border-bottom-width: 3px;
+  border-bottom-color: var(--board-grid-major);
 }
 .reveal-art .col-clues,
 .reveal-art .row-clues {
@@ -234,6 +252,7 @@ header {
 }
 .reveal-art .cell {
   border-color: transparent;
+  box-shadow: none;
   transition:
     border-color 0.35s ease,
     color 0.35s ease;
@@ -309,6 +328,10 @@ header {
 }
 .secondary {
   background: transparent;
+}
+.dev-only {
+  border-style: dashed;
+  color: var(--muted);
 }
 .stats {
   display: grid;
@@ -386,6 +409,13 @@ header {
 .archive-row.active {
   background: #eee6f8;
 }
+.archive-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
 .empty {
   text-align: center;
   padding: 4rem 1rem;
@@ -416,35 +446,56 @@ header {
 @media (prefers-color-scheme: dark) {
   :root {
     color: #eeeaf3;
-    background: #201c26;
+    background: #211d1c;
     --ink: #eeeaf3;
-    --paper: #292431;
-    --line: #50465a;
-    --muted: #b8acbd;
-    --grid: #655873;
+    --paper: #2c2725;
+    --line: #5b4d48;
+    --muted: #c3b5ae;
+    --grid: #85736b;
+    --grid-major: #d4c0b6;
   }
   body {
     background:
-      radial-gradient(circle at top right, #3c2e4c, transparent 36%), #201c26;
+      radial-gradient(circle at top right, #46334d, transparent 36%),
+      repeating-linear-gradient(0deg, #fff2 0 1px, transparent 1px 4px), #211d1c;
+  }
+  .grid-wrap {
+    /* Dark chrome may surround a physical light puzzle sheet; its ink stays dark. */
+    --board-paper: #fbf6ee;
+    --board-ink: #332b2b;
+    --board-grid: #95877d;
+    --board-grid-major: #574841;
+    --board-fill-edge: #4e326f99;
+    --board-cross: #8d5a88;
   }
 }
 [data-theme='dark'] {
   color: #eeeaf3;
-  background: #201c26;
+  background: #211d1c;
   --ink: #eeeaf3;
-  --paper: #292431;
-  --line: #50465a;
-  --muted: #b8acbd;
-  --grid: #655873;
+  --paper: #2c2725;
+  --line: #5b4d48;
+  --muted: #c3b5ae;
+  --grid: #85736b;
+  --grid-major: #d4c0b6;
+}
+[data-theme='dark'] .grid-wrap {
+  --board-paper: #fbf6ee;
+  --board-ink: #332b2b;
+  --board-grid: #95877d;
+  --board-grid-major: #574841;
+  --board-fill-edge: #4e326f99;
+  --board-cross: #8d5a88;
 }
 [data-theme='light'] {
-  color: #292333;
-  background: #fffaf5;
-  --ink: #292333;
-  --paper: #fff;
-  --line: #ded6e5;
-  --muted: #766d7e;
-  --grid: #cfc4d9;
+  color: #332b2b;
+  background: #f6efe5;
+  --ink: #332b2b;
+  --paper: #fffdf8;
+  --line: #d4c8bc;
+  --muted: #706365;
+  --grid: #a99b91;
+  --grid-major: #5e4f4a;
 }
 @media (max-width: 540px) {
   header {

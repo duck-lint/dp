@@ -258,6 +258,41 @@ function App() {
     setResultEntering(false);
     setNotice('Puzzle reset to 35:00.');
   };
+  const resetAllProgress = () => {
+    if (
+      !window.confirm(
+        'Reset all progress? This will remove saved progress, solved history, and streak data from this browser.',
+      )
+    )
+      return;
+    const next = emptySaved();
+    next.theme = data.theme;
+    setData(next);
+    saveData(next);
+    setPendingCompletionId(null);
+    setCompletionPhase('hidden');
+    setResultEntering(false);
+    setView('game');
+    setNotice('All local progress has been reset.');
+  };
+  const replayCurrent = () => {
+    if (!selected) return;
+    setData((previous) => {
+      const next = {
+        ...previous,
+        puzzles: { ...previous.puzzles, [selected.id]: empty(selected) },
+        completions: previous.completions.filter(
+          (completion) => completion.puzzleId !== selected.id,
+        ),
+      };
+      saveData(next);
+      return next;
+    });
+    setPendingCompletionId(null);
+    setCompletionPhase('hidden');
+    setResultEntering(false);
+    setNotice('Current puzzle replay reset.');
+  };
 
   if (!selected)
     return (
@@ -283,6 +318,7 @@ function App() {
             onSelect={setSelected}
             onClose={() => setView('game')}
             data={data}
+            onResetAll={resetAllProgress}
           />
         )}
       </main>
@@ -309,6 +345,7 @@ function App() {
           }}
           onClose={() => setView('game')}
           data={data}
+          onResetAll={resetAllProgress}
         />
       ) : (
         <>
@@ -338,6 +375,7 @@ function App() {
             onUndo={() => update((s) => undo(s))}
             onRedo={() => update((s) => redo(s))}
             onReset={reset}
+            onReplay={replayCurrent}
           />
           {state?.penaltyMs !== undefined &&
             state.penaltyMs > 0 &&
@@ -513,6 +551,7 @@ function Game({
   onUndo,
   onRedo,
   onReset,
+  onReplay,
 }: {
   puzzle: PuzzleDefinition;
   state: GameState;
@@ -526,6 +565,7 @@ function Game({
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
+  onReplay: () => void;
 }) {
   const rows = rowClues(puzzle.solution);
   const cols = columnClues(puzzle.solution);
@@ -643,6 +683,11 @@ function Game({
           Redo
         </button>
         <button onClick={onReset}>Reset</button>
+        {import.meta.env.DEV && (
+          <button className="dev-only" onClick={onReplay}>
+            Replay current
+          </button>
+        )}
       </div>
       <div
         className="grid-wrap"
@@ -725,12 +770,14 @@ function Archive({
   onSelect,
   onClose,
   data,
+  onResetAll,
 }: {
   puzzles: PuzzleDefinition[];
   selected: PuzzleDefinition | undefined;
   onSelect: (p: PuzzleDefinition) => void;
   onClose: () => void;
   data: SavedData;
+  onResetAll: () => void;
 }) {
   return (
     <section className="archive">
@@ -765,6 +812,11 @@ function Archive({
       <p className="muted">
         Future puzzles are kept off the board until their publication date.
       </p>
+      <div className="archive-actions">
+        <button className="secondary" onClick={onResetAll}>
+          Reset all progress
+        </button>
+      </div>
     </section>
   );
 }
