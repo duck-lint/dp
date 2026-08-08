@@ -148,18 +148,77 @@ test('shows the solved art before the delayed result and supports dismissal/reop
 
   await page.getByTestId('cell-1-6').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(0);
   await expect(page.locator('.reveal-art .cell.filled')).toHaveCount(92);
   await page.clock.fastForward(1799);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View result' })).toHaveCount(0);
   await page.clock.fastForward(1);
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCSS('opacity', '1');
-
-  await page.getByRole('button', { name: 'Close completion result' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Close completion result' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Share result' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'View archive' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', { name: 'Close completion result' }),
+  ).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'View archive' })).toBeFocused();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View result' })).toBeFocused();
+
   await expect(page.locator('.reveal-art .cell.filled')).toHaveCount(92);
   await page.getByRole('button', { name: 'View result' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('keeps completion UI from leaking after navigating to the archive', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.addInitScript(
+    (board) => {
+      window.localStorage.setItem(
+        'daily-picross:v1',
+        JSON.stringify({
+          puzzles: {
+            'p-2026-08-08-r2': {
+              board,
+              tool: 'fill',
+              history: [],
+              future: [],
+              startedAt: null,
+              remainingMs: 2_000_000,
+              penaltyMs: 0,
+              elapsedMs: 0,
+              completedAt: null,
+              failedAt: null,
+            },
+          },
+          completions: [],
+          theme: 'system',
+        }),
+      );
+    },
+    solvedBoard([1, 6]),
+  );
+  await page.goto('/');
+
+  await page.getByTestId('cell-1-6').click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await expect(page.getByRole('heading', { name: 'Archive' })).toBeVisible();
+
+  await page.clock.fastForward(2000);
+  await expect(page.getByRole('heading', { name: 'Archive' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('does not replay the result for an already-completed persisted puzzle', async ({

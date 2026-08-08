@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { columnClues, rowClues } from './domain/clues';
 import { localDateKey, formatDate } from './domain/dates';
@@ -49,6 +55,8 @@ function App() {
   );
   const [resultEntering, setResultEntering] = useState(false);
   const completionTimer = useRef<number | null>(null);
+  const completionCloseRef = useRef<HTMLButtonElement>(null);
+  const resultLinkRef = useRef<HTMLButtonElement>(null);
   const state = selected
     ? (data.puzzles[selected.id] ?? empty(selected))
     : null;
@@ -134,7 +142,7 @@ function App() {
     }
   }, [now, remainingMs, selected?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selected || !state || !completed || state.completedAt || timedOut)
       return;
     const finalState = checkpointTimer(state, Date.now());
@@ -154,8 +162,20 @@ function App() {
     setData(next);
     saveData(next);
     setPendingCompletionId(selected.id);
+    setCompletionPhase('delayed');
     setNotice('Puzzle complete! Your result and streak have been saved.');
   }, [completed, selected?.id, timedOut]);
+
+  useEffect(() => {
+    if (completionPhase !== 'open' || !resultEntering) return;
+    completionCloseRef.current?.focus();
+  }, [completionPhase, resultEntering]);
+
+  const closeCompletion = () => {
+    setCompletionPhase('hidden');
+    setResultEntering(false);
+    window.requestAnimationFrame(() => resultLinkRef.current?.focus());
+  };
 
   useEffect(() => {
     if (
@@ -331,19 +351,37 @@ function App() {
               aria-modal="true"
               onKeyDown={(event) => {
                 if (event.key === 'Escape') {
-                  setCompletionPhase('hidden');
-                  setResultEntering(false);
+                  event.preventDefault();
+                  closeCompletion();
+                  return;
+                }
+                if (event.key !== 'Tab') return;
+                const focusable = Array.from(
+                  event.currentTarget.querySelectorAll<HTMLElement>(
+                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                  ),
+                );
+                if (!focusable.length) {
+                  event.preventDefault();
+                  return;
+                }
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus();
                 }
               }}
             >
               <div>
                 <button
+                  ref={completionCloseRef}
                   className="completion-close"
                   aria-label="Close completion result"
-                  onClick={() => {
-                    setCompletionPhase('hidden');
-                    setResultEntering(false);
-                  }}
+                  onClick={closeCompletion}
                 >
                   ×
                 </button>
@@ -370,9 +408,12 @@ function App() {
               </div>
             </section>
           )}
-          {completed && completionPhase === 'hidden' && (
+          {completed &&
+            completionPhase === 'hidden' &&
+            pendingCompletionId !== selected.id && (
             <div className="result-link-wrap">
               <button
+                ref={resultLinkRef}
                 className="secondary"
                 onClick={() => {
                   setCompletionPhase('open');

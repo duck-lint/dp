@@ -209,6 +209,7 @@ header {
 }
 .reveal-art .picross {
   grid-template-columns: 0 repeat(var(--cols), var(--cell-size));
+  transition: grid-template-columns 0.35s ease;
 }
 .reveal-art .corner,
 .reveal-art .row-clues {
@@ -224,6 +225,12 @@ header {
 .reveal-art .clue-line {
   height: 0;
   overflow: hidden;
+}
+.reveal-art .clue-line {
+  transition:
+    opacity 0.35s ease,
+    height 0.35s ease,
+    width 0.35s ease;
 }
 .reveal-art .cell {
   border-color: transparent;
