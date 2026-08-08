@@ -16,9 +16,20 @@ Available checks also include `npm run lint`, `npm run format:check`, `npm run t
 
 ## Architecture
 
-`src/domain` owns immutable puzzle contracts, clue derivation, solving, dates, game transitions, completion comparison, and statistics. `src/persistence` owns versioned localStorage. React components render the board and dispatch domain transitions; they do not define Picross rules. `puzzles/seed.json` is the authored corpus and `tools/validate-puzzles.mjs` is the deterministic release gate.
+`src/domain` owns immutable puzzle contracts, clue derivation, solving, dates, game transitions, completion comparison, and statistics. `src/persistence` owns versioned localStorage. React components render the board and dispatch domain transitions; they do not define Picross rules. `puzzles/seed.json` is the authored corpus and `tools/validate-puzzles.ts` is the deterministic release gate.
 
 ## Puzzle authoring
+
+The development-only authoring lab is available while running `npm run dev` at
+`/author.html`. Draw or load a 15×15 candidate, inspect its clean silhouette and
+objective analysis, then copy the bitmap or complete candidate JSON for an
+ordinary reviewed corpus change. The lab never reads or writes gameplay
+persistence and is excluded from the production build.
+
+`npm run analyze:puzzles` prints the same raw analysis over the current seed
+corpus. A unique solution is not the same thing as a deterministic no-guess
+line solve, and neither establishes that a silhouette is recognizable or that
+the solve is satisfying; those remain separate human review questions.
 
 Add a `PuzzleDefinition` object to `puzzles/seed.json`:
 
@@ -37,7 +48,7 @@ Add a `PuzzleDefinition` object to `puzzles/seed.json`:
 
 Solutions contain one `1`/`0` string per row. Row and column clues are derived from that bitmap and are never authored separately. Validation rejects malformed data, duplicate identity/date/sequence values, blank puzzles, and any solution that is not uniquely solvable. Run `npm run validate:puzzles` before release.
 
-Puzzle IDs are immutable once persisted progress may exist. A material change to a puzzle's dimensions or authoritative solution requires a new ID; do not reuse the publication date or sequence number as a replacement identity.
+Puzzle IDs identify immutable puzzle definitions. Publication date and sequence number are not replacement identity. If the dimensions or authoritative solution change after progress may exist, assign a new puzzle ID; do not reuse an already-published or persisted puzzle ID for changed content.
 
 ## Dates, persistence, and streaks
 

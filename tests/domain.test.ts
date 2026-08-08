@@ -12,6 +12,13 @@ import {
 import { isSolved, makeBoard } from '../src/domain/puzzle';
 import { deriveStatistics } from '../src/domain/statistics';
 import { solvePicross } from '../src/domain/solver';
+import {
+  analyzeBitmap,
+  compatiblePatterns,
+  countSolutions,
+  linePatterns,
+  solveByLinePropagation,
+} from '../src/domain/puzzle-analysis';
 describe('picross domain', () => {
   it('derives clues including empty lines', () => {
     expect(lineClues([...'0000'])).toEqual([0]);
@@ -135,5 +142,56 @@ describe('picross domain', () => {
     expect(solvePicross([[2]], [[1], [0]]).count).toBe(0);
     expect(solvePicross([[1]], [[1], [0]]).count).toBe(1);
     expect(solvePicross([[1], [1]], [[1], [1]]).count).toBe(2);
+  });
+  it('generates legal line placements and filters partial lines', () => {
+    expect(linePatterns(5, [2, 1])).toEqual(['11010', '11001', '01101']);
+    expect(
+      compatiblePatterns(linePatterns(5, [2]), ['?', '1', '?', '0', '?']),
+    ).toEqual(['11000', '01100']);
+  });
+  it('counts zero, one, and two-plus clue-compatible boards', () => {
+    expect(countSolutions([[2]], [[1], [0]]).count).toBe(0);
+    expect(countSolutions([[1]], [[1], [0]]).count).toBe(1);
+    expect(countSolutions([[1], [1]], [[1], [1]]).count).toBe(2);
+  });
+  it('records deterministic propagation rounds without branching', () => {
+    const solved = ['10100', '01101', '00011', '01011', '10110'];
+    const result = solveByLinePropagation(
+      rowClues(solved),
+      columnClues(solved),
+    );
+    expect(result.solved).toBe(true);
+    expect(result.contradiction).toBe(false);
+    expect(result.rounds.length).toBeGreaterThan(1);
+    expect(result.initialForcedCells).toBe(result.rounds[0].forcedCells);
+  });
+  it('distinguishes a unique puzzle that line propagation cannot finish', () => {
+    const stalled = ['00000', '00111', '11100', '11000', '00011'];
+    const rows = rowClues(stalled);
+    const columns = columnClues(stalled);
+    expect(countSolutions(rows, columns).count).toBe(1);
+    const result = solveByLinePropagation(rows, columns);
+    expect(result).toMatchObject({
+      solved: false,
+      contradiction: false,
+      unresolvedCells: 16,
+    });
+    expect(result.board.join('').split('?')).toHaveLength(17);
+    expect(result.board.join('').match(/\?/g)).toHaveLength(16);
+    expect(
+      result.rounds.some((round) => round.board.join('').includes('?')),
+    ).toBe(true);
+  });
+  it('reports raw bitmap structure without aesthetic judgments', () => {
+    expect(analyzeBitmap(['100', '000', '001'])).toMatchObject({
+      metrics: {
+        filledCells: 2,
+        fillPercentage: (2 / 9) * 100,
+        connectedComponents: 2,
+        isolatedPixels: 2,
+        boundingBox: { width: 3, height: 3 },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      },
+    });
   });
 });
