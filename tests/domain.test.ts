@@ -170,11 +170,17 @@ describe('picross domain', () => {
     const rows = rowClues(stalled);
     const columns = columnClues(stalled);
     expect(countSolutions(rows, columns).count).toBe(1);
-    expect(solveByLinePropagation(rows, columns)).toMatchObject({
+    const result = solveByLinePropagation(rows, columns);
+    expect(result).toMatchObject({
       solved: false,
       contradiction: false,
       unresolvedCells: 16,
     });
+    expect(result.board.join('').split('?')).toHaveLength(17);
+    expect(result.board.join('').match(/\?/g)).toHaveLength(16);
+    expect(result.rounds.some((round) => round.board.join('').includes('?'))).toBe(
+      true,
+    );
   });
   it('reports raw bitmap structure without aesthetic judgments', () => {
     expect(analyzeBitmap(['100', '000', '001'])).toMatchObject({
