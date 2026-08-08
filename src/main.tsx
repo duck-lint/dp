@@ -258,6 +258,23 @@ function App() {
     setResultEntering(false);
     setNotice('Puzzle reset to 35:00.');
   };
+  const resetAllProgress = () => {
+    if (
+      !window.confirm(
+        'Reset all progress? This will remove saved progress, solved history, and streak data from this browser.',
+      )
+    )
+      return;
+    const next = emptySaved();
+    next.theme = data.theme;
+    setData(next);
+    saveData(next);
+    setPendingCompletionId(null);
+    setCompletionPhase('hidden');
+    setResultEntering(false);
+    setView('game');
+    setNotice('All local progress has been reset.');
+  };
 
   if (!selected)
     return (
@@ -270,6 +287,7 @@ function App() {
             saveData(next);
           }}
           onArchive={() => setView('archive')}
+          onResetAll={resetAllProgress}
         />
         <section className="empty">
           <h1>No puzzle published for this date</h1>
@@ -298,6 +316,7 @@ function App() {
           saveData(next);
         }}
         onArchive={() => setView('archive')}
+        onResetAll={resetAllProgress}
       />
       {view === 'archive' ? (
         <Archive
@@ -338,6 +357,13 @@ function App() {
             onUndo={() => update((s) => undo(s))}
             onRedo={() => update((s) => redo(s))}
             onReset={reset}
+            onReplay={() => {
+              update(() => empty(selected));
+              setPendingCompletionId(null);
+              setCompletionPhase('hidden');
+              setResultEntering(false);
+              setNotice('Current puzzle replay reset.');
+            }}
           />
           {state?.penaltyMs !== undefined &&
             state.penaltyMs > 0 &&
@@ -461,10 +487,12 @@ function App() {
 function Header({
   onArchive,
   onTheme,
+  onResetAll,
   theme,
 }: {
   onArchive: () => void;
   onTheme: () => void;
+  onResetAll: () => void;
   theme: SavedData['theme'];
 }) {
   return (
@@ -482,6 +510,9 @@ function Header({
         </button>
         <button className="header-button" onClick={onArchive}>
           Archive
+        </button>
+        <button className="header-button" onClick={onResetAll}>
+          Reset all progress
         </button>
       </div>
     </header>
@@ -513,6 +544,7 @@ function Game({
   onUndo,
   onRedo,
   onReset,
+  onReplay,
 }: {
   puzzle: PuzzleDefinition;
   state: GameState;
@@ -526,6 +558,7 @@ function Game({
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
+  onReplay: () => void;
 }) {
   const rows = rowClues(puzzle.solution);
   const cols = columnClues(puzzle.solution);
@@ -643,6 +676,11 @@ function Game({
           Redo
         </button>
         <button onClick={onReset}>Reset</button>
+        {import.meta.env.DEV && (
+          <button className="dev-only" onClick={onReplay}>
+            Replay current
+          </button>
+        )}
       </div>
       <div
         className="grid-wrap"
