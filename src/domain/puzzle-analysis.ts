@@ -80,7 +80,7 @@ export type PropagationRound = {
   round: number;
   forcedCells: number;
   resolvedCells: number;
-  board: string[];
+  board: Array<string>;
 };
 
 export type LinePropagationResult = {
@@ -151,9 +151,7 @@ export const solveByLinePropagation = (
       round,
       forcedCells,
       resolvedCells,
-      board: board.map((row) =>
-        row.map((cell) => (cell === '?' ? '0' : cell)).join(''),
-      ),
+      board: board.map((row) => row.join('')),
     });
     if (forcedCells === 0) break;
   }
@@ -164,9 +162,7 @@ export const solveByLinePropagation = (
     rounds,
     initialForcedCells: rounds[0]?.forcedCells ?? 0,
     unresolvedCells: board.flat().filter((cell) => cell === '?').length,
-    board: board.map((row) =>
-      row.map((cell) => (cell === '?' ? '0' : cell)).join(''),
-    ),
+    board: board.map((row) => row.join('')),
   };
 };
 
