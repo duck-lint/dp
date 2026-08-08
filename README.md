@@ -16,7 +16,7 @@ Available checks also include `npm run lint`, `npm run format:check`, `npm run t
 
 ## Architecture
 
-`src/domain` owns immutable puzzle contracts, clue derivation, solving, dates, game transitions, completion comparison, and statistics. `src/persistence` owns versioned localStorage. React components render the board and dispatch domain transitions; they do not define Picross rules. `puzzles/seed.json` is the authored corpus and `tools/validate-puzzles.mjs` is the deterministic release gate.
+`src/domain` owns immutable puzzle contracts, clue derivation, solving, dates, game transitions, completion comparison, and statistics. `src/persistence` owns versioned localStorage. React components render the board and dispatch domain transitions; they do not define Picross rules. `puzzles/seed.json` is the authored corpus and `tools/validate-puzzles.ts` is the deterministic release gate.
 
 ## Puzzle authoring
 
