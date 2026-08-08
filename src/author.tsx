@@ -22,9 +22,7 @@ function Author() {
   const [meta, setMeta] = useState(initialMeta);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
-  const gesture = useRef<{ pointerId: number; mode: GestureMode } | null>(
-    null,
-  );
+  const gesture = useRef<{ pointerId: number; mode: GestureMode } | null>(null);
   const analysis = useMemo(() => analyzeBitmap(solution), [solution]);
   const changedFromSource = Boolean(
     sourceId &&
