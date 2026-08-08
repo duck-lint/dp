@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { rowClues, columnClues } from '../src/domain/clues';
-import { solvePicross } from '../src/domain/solver';
+import { countSolutions } from '../src/domain/puzzle-analysis';
 import type { PuzzleDefinition } from '../src/domain/puzzle';
 const puzzles = JSON.parse(
   fs.readFileSync('puzzles/seed.json', 'utf8'),
@@ -32,7 +32,7 @@ for (const p of puzzles) {
     errors.push(`${prefix} malformed bitmap`);
   if (!p.solution.some((r) => r.includes('1')))
     errors.push(`${prefix} blank solution`);
-  const result = solvePicross(rowClues(p.solution), columnClues(p.solution));
+  const result = countSolutions(rowClues(p.solution), columnClues(p.solution));
   if (result.count !== 1)
     errors.push(`${prefix} expected one solution, found ${result.count}`);
 }
