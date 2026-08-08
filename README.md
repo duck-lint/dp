@@ -20,12 +20,23 @@ Available checks also include `npm run lint`, `npm run format:check`, `npm run t
 
 ## Puzzle authoring
 
+The development-only authoring lab is available while running `npm run dev` at
+`/author.html`. Draw or load a 15×15 candidate, inspect its clean silhouette and
+objective analysis, then copy the bitmap or complete candidate JSON for an
+ordinary reviewed corpus change. The lab never reads or writes gameplay
+persistence and is excluded from the production build.
+
+`npm run analyze:puzzles` prints the same raw analysis over the current seed
+corpus. A unique solution is not the same thing as a deterministic no-guess
+line solve, and neither establishes that a silhouette is recognizable or that
+the solve is satisfying; those remain separate human review questions.
+
 Add a `PuzzleDefinition` object to `puzzles/seed.json`:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "p-2026-08-20-r1",
+  "id": "p-2026-08-20",
   "sequenceNumber": 15,
   "publishDate": "2026-08-20",
   "width": 5,
@@ -36,8 +47,6 @@ Add a `PuzzleDefinition` object to `puzzles/seed.json`:
 ```
 
 Solutions contain one `1`/`0` string per row. Row and column clues are derived from that bitmap and are never authored separately. Validation rejects malformed data, duplicate identity/date/sequence values, blank puzzles, and any solution that is not uniquely solvable. Run `npm run validate:puzzles` before release.
-
-Puzzle IDs are immutable once persisted progress may exist. A material change to a puzzle's dimensions or authoritative solution requires a new ID; do not reuse the publication date or sequence number as a replacement identity.
 
 ## Dates, persistence, and streaks
 
