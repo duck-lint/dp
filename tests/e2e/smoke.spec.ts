@@ -389,3 +389,58 @@ test('keeps primary navigation and reset access usable on a narrow viewport', as
   );
   expect(archivePageWidth).toBeLessThanOrEqual(360);
 });
+
+test('keeps the playable board palette legible across theme modes', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  for (const mode of [
+    { name: 'light', theme: 'light' as const, colorScheme: 'light' as const },
+    { name: 'dark', theme: 'dark' as const, colorScheme: 'light' as const },
+    {
+      name: 'system-dark',
+      theme: 'system' as const,
+      colorScheme: 'dark' as const,
+    },
+  ]) {
+    await test.step(mode.name, async () => {
+      await page.emulateMedia({ colorScheme: mode.colorScheme });
+      await page.evaluate((theme) => {
+        const saved = JSON.parse(
+          localStorage.getItem('daily-picross:v1') ?? '{}',
+        );
+        localStorage.setItem(
+          'daily-picross:v1',
+          JSON.stringify({ ...saved, theme }),
+        );
+      }, mode.theme);
+      await page.reload();
+
+      const palette = await page.locator('.grid-wrap').evaluate((element) => {
+        const styles = getComputedStyle(element);
+        const rowClue = element.querySelector('.row-clues');
+        const cell = element.querySelector('.cell');
+        const majorCell = element.querySelector('.cell.major-x');
+        return {
+          paper: styles.backgroundColor,
+          ink: rowClue ? getComputedStyle(rowClue).color : '',
+          grid: cell ? getComputedStyle(cell).borderTopColor : '',
+          major: majorCell ? getComputedStyle(majorCell).borderRightColor : '',
+          boardInk: styles.getPropertyValue('--board-ink').trim(),
+          boardMajor: styles.getPropertyValue('--board-grid-major').trim(),
+        };
+      });
+
+      // Option B intentionally keeps a physical light paper sheet in dark
+      // chrome, so all board-local ink values must remain dark and distinct.
+      expect(palette.paper).toBe('rgb(251, 246, 238)');
+      expect(palette.ink).toBe('rgb(51, 43, 43)');
+      expect(palette.grid).not.toBe(palette.paper);
+      expect(palette.major).not.toBe(palette.paper);
+      expect(palette.major).not.toBe(palette.grid);
+      expect(palette.boardInk).toBe('#332b2b');
+      expect(palette.boardMajor).toMatch(/^#(?:5e4f4a|574841)$/);
+    });
+  }
+});
