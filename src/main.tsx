@@ -4,10 +4,14 @@ import { columnClues, rowClues } from './domain/clues';
 import { localDateKey, formatDate } from './domain/dates';
 import {
   applyCell,
+  checkpointTimer,
+  GAME_DURATION_MS,
   initialGame,
   redo,
+  remainingAt,
   undo,
   type GameState,
+  type MarkCommand,
   type Tool,
 } from './domain/game-state';
 import { formatDuration } from './domain/format';
@@ -37,53 +41,67 @@ function App() {
   const [view, setView] = useState<'game' | 'archive'>('game');
   const [notice, setNotice] = useState('');
   const [now, setNow] = useState(Date.now());
-  const [dragging, setDragging] = useState(false);
-  const lastCell = useRef('');
+  const [revealArt, setRevealArt] = useState(false);
   const state = selected
     ? (data.puzzles[selected.id] ?? empty(selected))
     : null;
-  const completed = selected && state ? isSolved(selected, state.board) : false;
+  const completed = Boolean(
+    selected && state && isSolved(selected, state.board),
+  );
+  const remainingMs = state ? remainingAt(state, now) : GAME_DURATION_MS;
+  const timedOut = Boolean(
+    state?.failedAt || (state?.startedAt && remainingMs === 0),
+  );
   const stats = useMemo(
     () => deriveStatistics(data.completions),
     [data.completions],
   );
+
   useEffect(() => {
-    if (!state?.startedAt || state.completedAt) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    setRevealArt(false);
+    if (completed) {
+      const id = window.setTimeout(() => setRevealArt(true), 450);
+      return () => window.clearTimeout(id);
+    }
+  }, [completed, selected?.id]);
+
+  useEffect(() => {
+    if (!state?.startedAt || state.completedAt || state.failedAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
-  }, [state?.startedAt, state?.completedAt]);
+  }, [state?.startedAt, state?.completedAt, state?.failedAt]);
+
   useEffect(() => {
-    if (!selected || !state || completed || !state.startedAt) return;
-    const next = {
-      ...data,
-      puzzles: {
-        ...data.puzzles,
-        [selected.id]: {
-          ...state,
-          elapsedMs:
-            state.elapsedMs + Math.max(0, now - (state.startedAt ?? now)),
-        },
-      },
-    };
-    if (now % 1000 < 100) {
+    if (
+      !selected ||
+      !state ||
+      state.completedAt ||
+      state.failedAt ||
+      !state.startedAt
+    )
+      return;
+    if (remainingMs !== 0 && now - state.startedAt < 900) return;
+    const nextState = checkpointTimer(state, now);
+    if (nextState !== state) {
+      const next = {
+        ...data,
+        puzzles: { ...data.puzzles, [selected.id]: nextState },
+      };
       setData(next);
       saveData(next);
     }
-  }, [now]);
+  }, [now, remainingMs, selected?.id]);
+
   useEffect(() => {
-    if (!selected || !state || !completed || state.completedAt) return;
+    if (!selected || !state || !completed || state.completedAt || timedOut)
+      return;
+    const finalState = checkpointTimer(state, Date.now());
     const record = {
       puzzleId: selected.id,
       date: selected.publishDate,
-      elapsedMs:
-        state.elapsedMs +
-        (state.startedAt ? Math.max(0, Date.now() - state.startedAt) : 0),
+      elapsedMs: GAME_DURATION_MS - finalState.remainingMs,
     };
-    const nextState = {
-      ...state,
-      completedAt: Date.now(),
-      elapsedMs: record.elapsedMs,
-    };
+    const nextState = { ...finalState, completedAt: Date.now() };
     const next = {
       ...data,
       puzzles: { ...data.puzzles, [selected.id]: nextState },
@@ -93,27 +111,68 @@ function App() {
     };
     setData(next);
     saveData(next);
-    setNotice('Puzzle complete! Your time and streak have been saved.');
-  }, [completed, selected]);
-  const update = (nextState: GameState) => {
-    if (!selected) return;
+    setNotice('Puzzle complete! Your result and streak have been saved.');
+  }, [completed, selected?.id, timedOut]);
+
+  useEffect(() => {
+    if (
+      !selected ||
+      !state ||
+      !state.startedAt ||
+      state.completedAt ||
+      state.failedAt ||
+      remainingMs !== 0
+    )
+      return;
+    const nextState = {
+      ...checkpointTimer(state, Date.now()),
+      failedAt: Date.now(),
+      remainingMs: 0,
+    };
     const next = {
       ...data,
       puzzles: { ...data.puzzles, [selected.id]: nextState },
     };
     setData(next);
     saveData(next);
+    setNotice('Time expired. The board is locked until you retry.');
+  }, [remainingMs, selected?.id, state?.failedAt]);
+
+  const update = (transform: (current: GameState) => GameState) => {
+    if (!selected) return;
+    setData((previous) => {
+      const currentState = previous.puzzles[selected.id] ?? empty(selected);
+      const nextState = transform(currentState);
+      const next = {
+        ...previous,
+        puzzles: { ...previous.puzzles, [selected.id]: nextState },
+      };
+      saveData(next);
+      return next;
+    });
   };
-  const paint = (y: number, x: number) => {
-    if (!state || !selected) return;
-    const key = `${y}:${x}`;
-    if (key === lastCell.current) return;
-    lastCell.current = key;
-    update(applyCell(state, y, x));
+  const paint = (
+    y: number,
+    x: number,
+    tool: MarkCommand,
+    clearOnly?: 'filled' | 'crossed',
+  ) => {
+    if (!selected) return;
+    update((currentState) =>
+      applyCell(
+        currentState,
+        y,
+        x,
+        tool,
+        selected.solution,
+        Date.now(),
+        clearOnly,
+      ),
+    );
   };
   const share = async () => {
-    if (!selected) return;
-    const text = `Daily Picross #${selected.sequenceNumber}\n${selected.width}×${selected.height} — solved in ${formatDuration(state?.elapsedMs ?? 0)}\nCurrent streak: ${stats.currentStreak}`;
+    if (!selected || !state) return;
+    const text = `Daily Picross #${selected.sequenceNumber}\n${selected.width}×${selected.height} — solved with ${formatDuration(state.remainingMs)} remaining\nCurrent streak: ${stats.currentStreak}`;
     try {
       if (navigator.share) await navigator.share({ text });
       else {
@@ -124,16 +183,24 @@ function App() {
       setNotice('Sharing was cancelled or unavailable.');
     }
   };
+  const reset = () => {
+    if (
+      !selected ||
+      !window.confirm('Reset this puzzle? Your progress will be cleared.')
+    )
+      return;
+    update(() => empty(selected));
+    setRevealArt(false);
+    setNotice('Puzzle reset to 35:00.');
+  };
+
   if (!selected)
     return (
       <main className="shell">
         <Header
           theme={data.theme}
           onTheme={() => {
-            const next = {
-              ...data,
-              theme: cycleTheme(data.theme),
-            };
+            const next = { ...data, theme: cycleTheme(data.theme) };
             setData(next);
             saveData(next);
           }}
@@ -155,15 +222,13 @@ function App() {
         )}
       </main>
     );
+
   return (
     <main className="shell" data-theme={data.theme}>
       <Header
         theme={data.theme}
         onTheme={() => {
-          const next = {
-            ...data,
-            theme: cycleTheme(data.theme),
-          };
+          const next = { ...data, theme: cycleTheme(data.theme) };
           setData(next);
           saveData(next);
         }}
@@ -193,34 +258,26 @@ function App() {
                 {selected.publishDate === today ? 'Today' : 'Archive puzzle'}
               </p>
             </div>
-            <div className="timer" aria-label="Solve time">
-              {formatDuration(
-                (state?.elapsedMs ?? 0) +
-                  (state?.startedAt && !state.completedAt
-                    ? Math.max(0, now - state.startedAt)
-                    : 0),
-              )}
+            <div
+              className={`timer ${timedOut ? 'timer-expired' : ''}`}
+              aria-label="Time remaining"
+            >
+              {formatDuration(remainingMs)}
             </div>
           </section>
           <Game
             puzzle={selected}
             state={state!}
+            revealArt={revealArt}
             onPaint={paint}
-            onTool={(tool) => update({ ...state!, tool })}
-            onUndo={() => update(undo(state!))}
-            onRedo={() => update(redo(state!))}
-            onReset={() => {
-              if (
-                window.confirm(
-                  'Reset this puzzle? Your progress will be cleared.',
-                )
-              )
-                update(empty(selected));
-            }}
-            dragging={dragging}
-            setDragging={setDragging}
-            lastCell={lastCell}
+            onUndo={() => update((s) => undo(s))}
+            onRedo={() => update((s) => redo(s))}
+            onReset={reset}
           />
+          {state?.penaltyMs !== undefined &&
+            state.penaltyMs > 0 &&
+            !completed &&
+            !timedOut && <PenaltyBadge key={state.penaltyMs} />}
           {completed && (
             <section
               className="completion"
@@ -232,8 +289,10 @@ function App() {
                 <h2 id="complete-title">{selected.reveal.title}</h2>
                 <p>{selected.reveal.description}</p>
                 <p>
-                  Solve time:{' '}
-                  <strong>{formatDuration(state?.elapsedMs ?? 0)}</strong>
+                  Solved with{' '}
+                  <strong>
+                    {formatDuration(state?.remainingMs ?? 0)} remaining
+                  </strong>
                 </p>
                 <p>
                   Current streak: <strong>{stats.currentStreak}</strong> · Best:{' '}
@@ -247,6 +306,17 @@ function App() {
                   View archive
                 </button>
               </div>
+            </section>
+          )}
+          {timedOut && !completed && (
+            <section className="result-state" role="alert">
+              <p className="eyebrow">Time expired</p>
+              <h2>That puzzle got away.</h2>
+              <p>Your board is preserved, but no further edits are accepted.</p>
+              <button onClick={reset}>Retry puzzle</button>
+              <button className="secondary" onClick={() => setView('archive')}>
+                Open archive
+              </button>
             </section>
           )}
           <section className="stats">
@@ -271,6 +341,7 @@ function App() {
     </main>
   );
 }
+
 function Header({
   onArchive,
   onTheme,
@@ -300,33 +371,98 @@ function Header({
     </header>
   );
 }
+
+function PenaltyBadge() {
+  return (
+    <div className="penalty" role="status">
+      -3:00
+    </div>
+  );
+}
+
+type Drag = {
+  y: number;
+  x: number;
+  tool: Tool;
+  clearOnly?: 'filled' | 'crossed';
+  axis: 'row' | 'column' | null;
+  visited: Set<string>;
+};
+
 function Game({
   puzzle,
   state,
+  revealArt,
   onPaint,
-  onTool,
   onUndo,
   onRedo,
   onReset,
-  dragging,
-  setDragging,
-  lastCell,
 }: {
   puzzle: PuzzleDefinition;
   state: GameState;
-  onPaint: (y: number, x: number) => void;
-  onTool: (t: Tool) => void;
+  revealArt: boolean;
+  onPaint: (
+    y: number,
+    x: number,
+    tool: MarkCommand,
+    clearOnly?: 'filled' | 'crossed',
+  ) => void;
   onUndo: () => void;
   onRedo: () => void;
   onReset: () => void;
-  dragging: boolean;
-  setDragging: (v: boolean) => void;
-  lastCell: React.MutableRefObject<string>;
 }) {
   const rows = rowClues(puzzle.solution);
   const cols = columnClues(puzzle.solution);
-  const pointer = (y: number, x: number) => onPaint(y, x);
-  const move = (
+  const [touchTool, setTouchTool] = useState<Tool>('fill');
+  const drag = useRef<Drag | null>(null);
+  const apply = (y: number, x: number, tool: Tool) => {
+    const key = `${y}:${x}`;
+    const d = drag.current;
+    if (!d || d.visited.has(key)) return;
+    d.visited.add(key);
+    onPaint(y, x, d.clearOnly ? 'erase' : tool, d.clearOnly);
+  };
+  const begin = (event: React.PointerEvent, y: number, x: number) => {
+    if (state.completedAt || state.failedAt) return;
+    event.preventDefault();
+    const tool: Tool =
+      event.pointerType === 'touch' || event.pointerType === 'pen'
+        ? touchTool
+        : event.button === 2
+          ? 'cross'
+          : 'fill';
+    drag.current = {
+      y,
+      x,
+      tool,
+      clearOnly:
+        state.board[y][x] === (tool === 'fill' ? 'filled' : 'crossed')
+          ? tool === 'fill'
+            ? 'filled'
+            : 'crossed'
+          : undefined,
+      axis: null,
+      visited: new Set(),
+    };
+    apply(y, x, tool);
+  };
+  const enter = (y: number, x: number) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.axis && (y !== d.y || x !== d.x))
+      d.axis = Math.abs(x - d.x) >= Math.abs(y - d.y) ? 'row' : 'column';
+    const target =
+      d.axis === 'row'
+        ? { y: d.y, x }
+        : d.axis === 'column'
+          ? { y, x: d.x }
+          : { y, x };
+    apply(target.y, target.x, d.tool);
+  };
+  const end = () => {
+    drag.current = null;
+  };
+  const focusMove = (
     event: React.KeyboardEvent<HTMLButtonElement>,
     y: number,
     x: number,
@@ -354,23 +490,40 @@ function Game({
     )?.focus();
   };
   return (
-    <section className="game">
-      <div className="toolbar" aria-label="Drawing tools">
-        {(['fill', 'cross', 'erase'] as Tool[]).map((t) => (
+    <section className={`game ${revealArt ? 'reveal-art' : ''}`}>
+      <div className="toolbar" aria-label="Puzzle controls">
+        <div className="touch-tools" aria-label="Touch marking tool">
           <button
-            key={t}
-            className={state.tool === t ? 'selected' : ''}
-            aria-pressed={state.tool === t}
-            onClick={() => onTool(t)}
+            className={touchTool === 'fill' ? 'selected' : ''}
+            aria-pressed={touchTool === 'fill'}
+            onClick={() => setTouchTool('fill')}
           >
-            {t === 'fill' ? 'Fill' : t === 'cross' ? 'Cross' : 'Erase'}
+            ■ <span>Fill</span>
           </button>
-        ))}
+          <button
+            className={touchTool === 'cross' ? 'selected' : ''}
+            aria-pressed={touchTool === 'cross'}
+            onClick={() => setTouchTool('cross')}
+          >
+            × <span>Cross</span>
+          </button>
+        </div>
         <span className="spacer" />
-        <button onClick={onUndo} disabled={!state.history.length}>
+        <button
+          onClick={onUndo}
+          disabled={
+            !state.history.length ||
+            Boolean(state.failedAt || state.completedAt)
+          }
+        >
           Undo
         </button>
-        <button onClick={onRedo} disabled={!state.future.length}>
+        <button
+          onClick={onRedo}
+          disabled={
+            !state.future.length || Boolean(state.failedAt || state.completedAt)
+          }
+        >
           Redo
         </button>
         <button onClick={onReset}>Reset</button>
@@ -401,24 +554,20 @@ function Game({
                   className={`cell ${cell} ${(x + 1) % 5 === 0 ? 'major-x' : ''} ${(y + 1) % 5 === 0 ? 'major-y' : ''}`}
                   aria-label={`Row ${y + 1}, column ${x + 1}, ${cell}`}
                   data-testid={`cell-${y}-${x}`}
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                    setDragging(true);
-                    lastCell.current = '';
-                    pointer(y, x);
-                  }}
-                  onPointerEnter={() => dragging && pointer(y, x)}
-                  onPointerUp={() => setDragging(false)}
+                  onPointerDown={(event) => begin(event, y, x)}
+                  onPointerEnter={() => enter(y, x)}
+                  onPointerUp={end}
+                  onPointerCancel={end}
                   onContextMenu={(event) => event.preventDefault()}
                   onKeyDown={(event) => {
-                    move(event, y, x);
+                    focusMove(event, y, x);
                     if (event.key === ' ' || event.key === 'Enter') {
                       event.preventDefault();
-                      pointer(y, x);
+                      onPaint(y, x, 'fill');
                     }
-                    if (event.key.toLowerCase() === 'x') onTool('cross');
+                    if (event.key.toLowerCase() === 'x') onPaint(y, x, 'cross');
                     if (event.key === 'Backspace' || event.key === 'Delete')
-                      onTool('erase');
+                      onPaint(y, x, 'erase');
                     if (event.key.toLowerCase() === 'z' && !event.shiftKey)
                       onUndo();
                     if (
@@ -436,12 +585,18 @@ function Game({
         </div>
       </div>
       <p className="hint">
-        Fill the picture, or use Cross to mark cells you know are empty. Crosses
-        are optional.
+        <span className="fine-pointer-hint">
+          Left click fills · right click crosses · drag to paint a run
+        </span>
+        <span className="coarse-pointer-hint">
+          Choose Fill or Cross, then tap or drag across the grid
+        </span>
+        . Crosses are optional.
       </p>
     </section>
   );
 }
+
 function Archive({
   puzzles,
   selected,
@@ -491,4 +646,5 @@ function Archive({
     </section>
   );
 }
+
 createRoot(document.getElementById('root')!).render(<App />);
