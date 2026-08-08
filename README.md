@@ -25,7 +25,7 @@ Add a `PuzzleDefinition` object to `puzzles/seed.json`:
 ```json
 {
   "schemaVersion": 1,
-  "id": "p-2026-08-20",
+  "id": "p-2026-08-20-r1",
   "sequenceNumber": 15,
   "publishDate": "2026-08-20",
   "width": 5,
@@ -36,6 +36,8 @@ Add a `PuzzleDefinition` object to `puzzles/seed.json`:
 ```
 
 Solutions contain one `1`/`0` string per row. Row and column clues are derived from that bitmap and are never authored separately. Validation rejects malformed data, duplicate identity/date/sequence values, blank puzzles, and any solution that is not uniquely solvable. Run `npm run validate:puzzles` before release.
+
+Puzzle IDs are immutable once persisted progress may exist. A material change to a puzzle's dimensions or authoritative solution requires a new ID; do not reuse the publication date or sequence number as a replacement identity.
 
 ## Dates, persistence, and streaks
 
