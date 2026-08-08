@@ -41,7 +41,14 @@ function App() {
   const [view, setView] = useState<'game' | 'archive'>('game');
   const [notice, setNotice] = useState('');
   const [now, setNow] = useState(Date.now());
-  const [revealArt, setRevealArt] = useState(false);
+  const [completionPhase, setCompletionPhase] = useState<
+    'hidden' | 'delayed' | 'open'
+  >('hidden');
+  const [pendingCompletionId, setPendingCompletionId] = useState<string | null>(
+    null,
+  );
+  const [resultEntering, setResultEntering] = useState(false);
+  const completionTimer = useRef<number | null>(null);
   const state = selected
     ? (data.puzzles[selected.id] ?? empty(selected))
     : null;
@@ -57,13 +64,48 @@ function App() {
     [data.completions],
   );
 
+  // The celebration is a transient presentation event, not a projection of
+  // persistent completion. Navigation and puzzle changes cancel it entirely.
   useEffect(() => {
-    setRevealArt(false);
-    if (completed) {
-      const id = window.setTimeout(() => setRevealArt(true), 450);
-      return () => window.clearTimeout(id);
-    }
-  }, [completed, selected?.id]);
+    return () => {
+      if (completionTimer.current !== null) {
+        window.clearTimeout(completionTimer.current);
+        completionTimer.current = null;
+      }
+      setPendingCompletionId(null);
+      setCompletionPhase('hidden');
+      setResultEntering(false);
+    };
+  }, [selected?.id, view]);
+
+  useEffect(() => {
+    if (!selected || view !== 'game' || pendingCompletionId !== selected.id)
+      return;
+    setCompletionPhase('delayed');
+    completionTimer.current = window.setTimeout(() => {
+      setCompletionPhase('open');
+      setPendingCompletionId(null);
+      window.requestAnimationFrame(() => setResultEntering(true));
+    }, 1800);
+    return () => {
+      if (completionTimer.current !== null) {
+        window.clearTimeout(completionTimer.current);
+        completionTimer.current = null;
+      }
+    };
+  }, [pendingCompletionId, selected?.id, view]);
+
+  useEffect(() => {
+    if (completionPhase !== 'open') return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setCompletionPhase('hidden');
+        setResultEntering(false);
+      }
+    };
+    document.addEventListener('keydown', dismiss);
+    return () => document.removeEventListener('keydown', dismiss);
+  }, [completionPhase]);
 
   useEffect(() => {
     if (!state?.startedAt || state.completedAt || state.failedAt) return;
@@ -111,6 +153,7 @@ function App() {
     };
     setData(next);
     saveData(next);
+    setPendingCompletionId(selected.id);
     setNotice('Puzzle complete! Your result and streak have been saved.');
   }, [completed, selected?.id, timedOut]);
 
@@ -190,7 +233,9 @@ function App() {
     )
       return;
     update(() => empty(selected));
-    setRevealArt(false);
+    setPendingCompletionId(null);
+    setCompletionPhase('hidden');
+    setResultEntering(false);
     setNotice('Puzzle reset to 35:00.');
   };
 
@@ -268,7 +313,7 @@ function App() {
           <Game
             puzzle={selected}
             state={state!}
-            revealArt={revealArt}
+            revealArt={completed}
             onPaint={paint}
             onUndo={() => update((s) => undo(s))}
             onRedo={() => update((s) => redo(s))}
@@ -278,13 +323,30 @@ function App() {
             state.penaltyMs > 0 &&
             !completed &&
             !timedOut && <PenaltyBadge key={state.penaltyMs} />}
-          {completed && (
+          {completed && completionPhase === 'open' && (
             <section
-              className="completion"
+              className={`completion ${resultEntering ? 'is-visible' : ''}`}
               role="dialog"
               aria-labelledby="complete-title"
+              aria-modal="true"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setCompletionPhase('hidden');
+                  setResultEntering(false);
+                }
+              }}
             >
               <div>
+                <button
+                  className="completion-close"
+                  aria-label="Close completion result"
+                  onClick={() => {
+                    setCompletionPhase('hidden');
+                    setResultEntering(false);
+                  }}
+                >
+                  ×
+                </button>
                 <p className="eyebrow">Solved</p>
                 <h2 id="complete-title">{selected.reveal.title}</h2>
                 <p>{selected.reveal.description}</p>
@@ -307,6 +369,19 @@ function App() {
                 </button>
               </div>
             </section>
+          )}
+          {completed && completionPhase === 'hidden' && (
+            <div className="result-link-wrap">
+              <button
+                className="secondary"
+                onClick={() => {
+                  setCompletionPhase('open');
+                  setResultEntering(true);
+                }}
+              >
+                View result
+              </button>
+            </div>
           )}
           {timedOut && !completed && (
             <section className="result-state" role="alert">
@@ -528,7 +603,13 @@ function Game({
         </button>
         <button onClick={onReset}>Reset</button>
       </div>
-      <div className="grid-wrap">
+      <div
+        className="grid-wrap"
+        onContextMenuCapture={(event) => event.preventDefault()}
+        onAuxClickCapture={(event) => {
+          if (event.button === 2) event.preventDefault();
+        }}
+      >
         <div
           className="picross"
           style={{ '--cols': puzzle.width } as React.CSSProperties}
