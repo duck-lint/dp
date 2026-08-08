@@ -2,6 +2,39 @@ import { test, expect } from '@playwright/test';
 
 test.use({ timezoneId: 'UTC' });
 
+test('authoring lab edits and clears a fixed 15x15 bitmap', async ({
+  page,
+}) => {
+  await page.goto('/author.html');
+  await expect(
+    page.getByRole('heading', { name: 'Picross authoring lab' }),
+  ).toBeVisible();
+  const cells = page.locator('.author-editor button');
+  await expect(cells).toHaveCount(225);
+  await cells.nth(0).click();
+  await expect(cells.nth(0)).toHaveAccessibleName(/filled/);
+  await expect(page.locator('.metrics')).toContainText('Filled cells');
+  await page.getByRole('button', { name: 'Clear' }).click();
+  await expect(cells.nth(0)).toHaveAccessibleName(/empty/);
+});
+
+test('authoring lab loads seeds and protects immutable identity on export', async ({
+  page,
+}) => {
+  await page.goto('/author.html');
+  await page.getByLabel('Load seed').selectOption('p-2026-08-08-r2');
+  await expect(page.locator('.author-editor .filled')).toHaveCount(92);
+  await page.locator('.author-editor button').nth(0).click();
+  await expect(page.getByText(/solution changed/i)).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Copy puzzle JSON' }),
+  ).toBeDisabled();
+  await page.getByLabel('ID').fill('candidate-new');
+  await expect(
+    page.getByRole('button', { name: 'Copy puzzle JSON' }),
+  ).toBeEnabled();
+});
+
 test('opens the daily puzzle and archive', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText(/Daily Picross/).first()).toBeVisible();
