@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+
+test.use({ timezoneId: 'UTC' });
+
 test('opens the daily puzzle and archive', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText(/Daily Picross/).first()).toBeVisible();
@@ -10,6 +13,8 @@ test('rejects an incompatible persisted board before rendering the game', async 
 }) => {
   const runtimeErrors: Error[] = [];
   page.on('pageerror', (error) => runtimeErrors.push(error));
+
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
 
   await page.addInitScript(() => {
     const legacyBoard = Array.from({ length: 5 }, () =>
@@ -45,3 +50,4 @@ test('rejects an incompatible persisted board before rendering the game', async 
   await expect(page.getByTestId(/^cell-/)).toHaveCount(225);
   expect(runtimeErrors).toEqual([]);
 });
+ac2d9ed38f938339b2fc56eba1875603899a7f11
