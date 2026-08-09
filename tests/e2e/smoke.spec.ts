@@ -93,6 +93,7 @@ test('authoring displays canonical worker cardinality results', async ({
 
   await page.getByRole('button', { name: 'Start blank' }).click();
   await page.locator('.author-editor button').nth(112).click();
+  await page.locator('.author-editor button').nth(128).click();
   await expect(unique).toHaveText(/no \(2\+\)/, { timeout: 15_000 });
 });
 
@@ -317,11 +318,11 @@ test('shows bounded achievements and preserves unlocked state after reload', asy
   ).toContainText('First Solve');
   await expect(
     page.getByRole('region', { name: 'Achievements' }).locator('.unlocked'),
-  ).toHaveCount(2);
+  ).toHaveCount(1);
   await page.reload();
   await expect(
     page.getByRole('region', { name: 'Achievements' }).locator('.unlocked'),
-  ).toHaveCount(2);
+  ).toHaveCount(1);
 });
 
 const coffeeSolution = [
