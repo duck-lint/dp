@@ -242,11 +242,28 @@ test('ends gameplay drag when the pointer leaves and re-enters the board', async
 
 test('shows and clears a prominent wrong-guess penalty', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({ theme: 'light', puzzles: {}, completions: [] }),
+    );
+  });
   await page.goto('/');
   await page.getByTestId('cell-0-0').click();
   const penalty = page.getByRole('status').filter({ hasText: '-3:00' });
   await expect(penalty).toBeVisible();
   await expect(penalty.locator('strong')).toHaveText('-3:00');
+  const colors = await penalty.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      foreground: styles.color,
+      background: styles.backgroundColor,
+    };
+  });
+  expect(colors).toEqual({
+    foreground: 'rgb(255, 255, 255)',
+    background: 'rgb(163, 61, 80)',
+  });
   await expect(penalty).toHaveCount(0, { timeout: 3000 });
 });
 
