@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { createRoot } from 'react-dom/client';
 import { columnClues, rowClues } from './domain/clues';
+import { deriveAchievements } from './domain/achievements';
 import { localDateKey, formatDate } from './domain/dates';
 import {
   applyCell,
@@ -54,12 +55,14 @@ function App() {
     null,
   );
   const [resultEntering, setResultEntering] = useState(false);
+  const [penaltyFeedback, setPenaltyFeedback] = useState<number | null>(null);
   const completionTimer = useRef<number | null>(null);
   const completionCloseRef = useRef<HTMLButtonElement>(null);
   const resultLinkRef = useRef<HTMLButtonElement>(null);
   const state = selected
     ? (data.puzzles[selected.id] ?? empty(selected))
     : null;
+  const previousPenalty = useRef(state?.penaltyMs ?? 0);
   const completed = Boolean(
     selected && state && isSolved(selected, state.board),
   );
@@ -71,6 +74,28 @@ function App() {
     () => deriveStatistics(data.completions),
     [data.completions],
   );
+  const achievements = useMemo(
+    () =>
+      deriveAchievements(
+        data.completions,
+        data.puzzles,
+        stats.currentStreak,
+        stats.bestStreak,
+      ),
+    [data.completions, data.puzzles, stats.currentStreak, stats.bestStreak],
+  );
+
+  useEffect(() => {
+    const penaltyMs = state?.penaltyMs ?? 0;
+    if (penaltyMs <= previousPenalty.current) {
+      previousPenalty.current = penaltyMs;
+      return;
+    }
+    previousPenalty.current = penaltyMs;
+    setPenaltyFeedback(penaltyMs);
+    const id = window.setTimeout(() => setPenaltyFeedback(null), 1500);
+    return () => window.clearTimeout(id);
+  }, [state?.penaltyMs]);
 
   // The celebration is a transient presentation event, not a projection of
   // persistent completion. Navigation and puzzle changes cancel it entirely.
@@ -377,10 +402,9 @@ function App() {
             onReset={reset}
             onReplay={replayCurrent}
           />
-          {state?.penaltyMs !== undefined &&
-            state.penaltyMs > 0 &&
-            !completed &&
-            !timedOut && <PenaltyBadge key={state.penaltyMs} />}
+          {penaltyFeedback !== null && !completed && !timedOut && (
+            <PenaltyBadge key={penaltyFeedback} />
+          )}
           {completed && completionPhase === 'open' && (
             <section
               className={`completion ${resultEntering ? 'is-visible' : ''}`}
@@ -473,18 +497,19 @@ function App() {
               </button>
             </section>
           )}
-          <section className="stats">
+          <section className="stats" aria-label="Progress statistics">
             <strong>{stats.total}</strong>
             <span>completed</span>
             <strong>{stats.currentStreak}</strong>
             <span>current streak</span>
             <strong>{stats.bestStreak}</strong>
             <span>best streak</span>
-            <small>
+            <small className="stats-help">
               Streaks count consecutive published puzzle dates completed;
               solving an archive puzzle can repair a gap.
             </small>
           </section>
+          <Achievements achievements={achievements} />
           {notice && (
             <p className="notice" role="status">
               {notice}
@@ -528,9 +553,47 @@ function Header({
 
 function PenaltyBadge() {
   return (
-    <div className="penalty" role="status">
-      -3:00
+    <div className="penalty" role="status" aria-live="assertive">
+      <span>Time penalty</span>
+      <strong>-3:00</strong>
     </div>
+  );
+}
+
+function Achievements({
+  achievements,
+}: {
+  achievements: ReturnType<typeof deriveAchievements>;
+}) {
+  return (
+    <section className="achievements" aria-label="Achievements">
+      <div className="achievements-head">
+        <div>
+          <p className="eyebrow">Progress</p>
+          <h2>Achievements</h2>
+        </div>
+        <span className="muted">
+          {achievements.filter((achievement) => achievement.unlocked).length}/
+          {achievements.length}
+        </span>
+      </div>
+      <div className="achievement-list">
+        {achievements.map((achievement) => (
+          <div
+            className={`achievement ${achievement.unlocked ? 'unlocked' : 'locked'}`}
+            key={achievement.id}
+          >
+            <span className="achievement-mark" aria-hidden="true">
+              {achievement.unlocked ? '✓' : '·'}
+            </span>
+            <div>
+              <strong>{achievement.name}</strong>
+              <small>{achievement.description}</small>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -571,6 +634,17 @@ function Game({
   const cols = columnClues(puzzle.solution);
   const [touchTool, setTouchTool] = useState<Tool>('fill');
   const drag = useRef<Drag | null>(null);
+  useEffect(() => {
+    const cancel = () => {
+      drag.current = null;
+    };
+    window.addEventListener('blur', cancel);
+    document.addEventListener('visibilitychange', cancel);
+    return () => {
+      window.removeEventListener('blur', cancel);
+      document.removeEventListener('visibilitychange', cancel);
+    };
+  }, []);
   const apply = (y: number, x: number, tool: Tool) => {
     const key = `${y}:${x}`;
     const d = drag.current;
@@ -691,6 +765,9 @@ function Game({
       </div>
       <div
         className="grid-wrap"
+        onPointerLeave={end}
+        onPointerUp={end}
+        onPointerCancel={end}
         onContextMenuCapture={(event) => event.preventDefault()}
         onAuxClickCapture={(event) => {
           if (event.button === 2) event.preventDefault();
@@ -698,12 +775,22 @@ function Game({
       >
         <div
           className="picross"
-          style={{ '--cols': puzzle.width } as React.CSSProperties}
+          style={
+            {
+              '--cols': puzzle.width,
+              '--max-col-depth': Math.max(...cols.map((clue) => clue.length)),
+              '--row-clue-units': Math.max(
+                ...rows.map((clue) =>
+                  Math.max(1, clue.join(' ').length * 0.62),
+                ),
+              ),
+            } as React.CSSProperties
+          }
         >
           <div className="corner" />
           <div className="col-clues">
             {cols.map((clue, x) => (
-              <div key={x} className="clue-line">
+              <div key={x} className="clue-line" data-testid={`col-clue-${x}`}>
                 {clue.map((number, i) => (
                   <span key={i}>{number}</span>
                 ))}
@@ -712,7 +799,7 @@ function Game({
           </div>
           {rows.map((clue, y) => (
             <React.Fragment key={y}>
-              <div className="row-clues">
+              <div className="row-clues" data-testid={`row-clue-${y}`}>
                 <span>{clue.join(' ')}</span>
               </div>
               {state.board[y].map((cell, x) => (
