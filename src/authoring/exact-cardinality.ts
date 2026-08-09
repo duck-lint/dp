@@ -39,13 +39,17 @@ export const createExactCardinalityCoordinator = ({
   let activeWorker: WorkerLike | undefined;
   let disposed = false;
 
+  const finishWorker = (worker: WorkerLike) => {
+    worker.terminate();
+    if (activeWorker === worker) activeWorker = undefined;
+  };
+
   const cancelActive = () => {
     if (timer !== undefined) {
       clearTimeout(timer);
       timer = undefined;
     }
-    activeWorker?.terminate();
-    activeWorker = undefined;
+    if (activeWorker) finishWorker(activeWorker);
   };
 
   const update = (rows: number[][], columns: number[][]) => {
@@ -66,16 +70,27 @@ export const createExactCardinalityCoordinator = ({
       activeWorker = worker;
       onState({ status: 'checking' });
       worker.onmessage = ({ data }) => {
+        finishWorker(worker);
         if (disposed || requestGeneration !== generation) return;
-        activeWorker = undefined;
+        if (typeof data?.count !== 'number') {
+          onState({ status: 'error' });
+          return;
+        }
         onState({ status: 'ready', count: data.count });
       };
       worker.onerror = () => {
+        finishWorker(worker);
         if (disposed || requestGeneration !== generation) return;
-        activeWorker = undefined;
         onState({ status: 'error' });
       };
-      worker.postMessage({ rows, columns });
+      try {
+        worker.postMessage({ rows, columns });
+      } catch {
+        finishWorker(worker);
+        if (!disposed && requestGeneration === generation) {
+          onState({ status: 'error' });
+        }
+      }
     }, debounceMs);
   };
 
