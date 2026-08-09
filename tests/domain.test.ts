@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { columnClues, lineClues, rowClues } from '../src/domain/clues';
 import { choosePuzzle, localDateKey } from '../src/domain/dates';
 import {
@@ -20,6 +20,11 @@ import {
   linePatterns,
   solveByLinePropagation,
 } from '../src/domain/puzzle-analysis';
+import {
+  CardinalityAnalysisController,
+  type CardinalityState,
+  type CardinalityWorker,
+} from '../src/authoring/cardinality-analysis';
 describe('picross domain', () => {
   it('derives clues including empty lines', () => {
     expect(lineClues([...'0000'])).toEqual([0]);
@@ -141,18 +146,10 @@ describe('picross domain', () => {
   });
   it('derives bounded achievements from local completion records', () => {
     const completions = [
-      { puzzleId: 'clean', date: '2026-08-06', elapsedMs: 1000 },
-      { puzzleId: 'penalized', date: '2026-08-07', elapsedMs: 2000 },
+      { puzzleId: 'first', date: '2026-08-06', elapsedMs: 1000 },
+      { puzzleId: 'second', date: '2026-08-07', elapsedMs: 2000 },
     ];
-    const achievements = deriveAchievements(
-      completions,
-      {
-        clean: { ...initialGame(1, 1), penaltyMs: 0 },
-        penalized: { ...initialGame(1, 1), penaltyMs: 180000 },
-      },
-      2,
-      3,
-    );
+    const achievements = deriveAchievements(completions, 2, 3);
     expect(
       achievements.find((item) => item.id === 'first-solve')?.unlocked,
     ).toBe(true);
@@ -160,13 +157,37 @@ describe('picross domain', () => {
       true,
     );
     expect(
-      achievements.find((item) => item.id === 'clean-solve')?.unlocked,
+      achievements.find((item) => item.id === 'three-solves')?.unlocked,
+    ).toBe(false);
+    expect(achievements.find((item) => item.id === 'explorer')?.unlocked).toBe(
+      false,
+    );
+  });
+  it('derives completion milestones from unique completion IDs and streaks', () => {
+    const completions = [
+      { puzzleId: 'a', date: '2026-08-06', elapsedMs: 1000 },
+      { puzzleId: 'b', date: '2026-08-07', elapsedMs: 2000 },
+      { puzzleId: 'c', date: '2026-08-08', elapsedMs: 3000 },
+      { puzzleId: 'c', date: '2026-08-08', elapsedMs: 3000 },
+    ];
+    const achievements = deriveAchievements(completions, 1, 7);
+
+    expect(achievements.find((item) => item.id === 'first-solve')?.unlocked).toBe(
+      true,
+    );
+    expect(achievements.find((item) => item.id === 'streak-3')?.unlocked).toBe(
+      true,
+    );
+    expect(achievements.find((item) => item.id === 'streak-7')?.unlocked).toBe(
+      true,
+    );
+    expect(
+      achievements.find((item) => item.id === 'three-solves')?.unlocked,
     ).toBe(true);
     expect(achievements.find((item) => item.id === 'explorer')?.unlocked).toBe(
       false,
     );
   });
-
   it('distinguishes unsolvable, unique, and ambiguous line systems', () => {
     expect(solvePicross([[2]], [[1], [0]]).count).toBe(0);
     expect(solvePicross([[1]], [[1], [0]]).count).toBe(1);
@@ -222,5 +243,116 @@ describe('picross domain', () => {
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
       },
     });
+  });
+  it('cancels obsolete cardinality work and ignores stale results', () => {
+    vi.useFakeTimers();
+    const states: string[] = [];
+    const workers: Array<{
+      worker: CardinalityWorker;
+      respond: (count: 0 | 1 | 2) => void;
+    }> = [];
+    const controller = new CardinalityAnalysisController(
+      (state) => states.push(`${state.status}:${state.count ?? ''}`),
+      () => {
+        let respond!: (count: 0 | 1 | 2) => void;
+        const worker: CardinalityWorker = {
+          onmessage: null,
+          onerror: null,
+          postMessage: () => undefined,
+          terminate: vi.fn(),
+        };
+        respond = (count) =>
+          worker.onmessage?.({ data: { count } } as MessageEvent);
+        workers.push({ worker, respond });
+        return worker;
+      },
+      10,
+    );
+
+    controller.update({ rows: [[1]], columns: [[1]] });
+    vi.advanceTimersByTime(10);
+    expect(states).toEqual(['pending:', 'checking:']);
+    const firstWorker = workers[0].worker;
+
+    controller.update({ rows: [[0]], columns: [[0]] });
+    expect(firstWorker.terminate).toHaveBeenCalled();
+    expect(states.at(-1)).toBe('pending:');
+    workers[0].respond(1);
+    expect(states.at(-1)).toBe('pending:');
+
+    vi.advanceTimersByTime(10);
+    workers[1].respond(2);
+    expect(states.at(-1)).toBe('ready:2');
+
+    controller.update({ rows: [[1]], columns: [[1]] });
+    controller.dispose();
+    expect(workers[1].worker.terminate).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('terminates a worker after a successful result', () => {
+    vi.useFakeTimers();
+    const states: CardinalityState[] = [];
+    let worker!: CardinalityWorker;
+    const controller = new CardinalityAnalysisController(
+      (state) => states.push(state),
+      () => {
+        worker = {
+          onmessage: null,
+          onerror: null,
+          postMessage: () => undefined,
+          terminate: vi.fn(),
+        };
+        return worker;
+      },
+      10,
+    );
+
+    controller.update({ rows: [[1]], columns: [[1]] });
+    vi.advanceTimersByTime(10);
+    worker.onmessage!({ data: { count: 1 } } as MessageEvent);
+
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toEqual({ status: 'ready', count: 1 });
+
+    controller.update({ rows: [[0]], columns: [[0]] });
+    vi.advanceTimersByTime(10);
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('terminates a worker after an error and allows a fresh request', () => {
+    vi.useFakeTimers();
+    const states: CardinalityState[] = [];
+    const workers: CardinalityWorker[] = [];
+    const controller = new CardinalityAnalysisController(
+      (state) => states.push(state),
+      () => {
+        const worker: CardinalityWorker = {
+          onmessage: null,
+          onerror: null,
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+        };
+        workers.push(worker);
+        return worker;
+      },
+      10,
+    );
+
+    controller.update({ rows: [[1]], columns: [[1]] });
+    vi.advanceTimersByTime(10);
+    workers[0].onerror!({} as ErrorEvent);
+
+    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toEqual({ status: 'error' });
+
+    controller.update({ rows: [[0]], columns: [[0]] });
+    vi.advanceTimersByTime(10);
+    expect(workers).toHaveLength(2);
+    workers[1].onmessage!({ data: { count: 0 } } as MessageEvent);
+    expect(workers[1].terminate).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toEqual({ status: 'ready', count: 0 });
+    vi.useRealTimers();
   });
 });
