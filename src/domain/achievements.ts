@@ -1,4 +1,3 @@
-import type { GameState } from './game-state';
 import type { Completion } from './statistics';
 
 export interface Achievement {
@@ -14,7 +13,6 @@ export interface Achievement {
  */
 export const deriveAchievements = (
   completions: Completion[],
-  puzzles: Record<string, GameState>,
   currentStreak: number,
   bestStreak: number,
 ): Achievement[] => [
@@ -37,12 +35,11 @@ export const deriveAchievements = (
     unlocked: Math.max(currentStreak, bestStreak) >= 7,
   },
   {
-    id: 'clean-solve',
-    name: 'Clean Solve',
-    description: 'Complete a puzzle without a wrong-guess penalty.',
-    unlocked: completions.some(
-      (completion) => (puzzles[completion.puzzleId]?.penaltyMs ?? 0) === 0,
-    ),
+    id: 'three-solves',
+    name: 'Three Solves',
+    description: 'Complete three different puzzles.',
+    unlocked:
+      new Set(completions.map((completion) => completion.puzzleId)).size >= 3,
   },
   {
     id: 'explorer',
