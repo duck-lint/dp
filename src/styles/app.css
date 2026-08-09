@@ -60,6 +60,9 @@ header {
   font-weight: 800;
   text-decoration: none;
   color: var(--ink);
+  text-shadow:
+    0 1px 0 var(--paper),
+    0 2px 5px #3d2b2518;
 }
 .brand span {
   color: var(--accent);
@@ -85,6 +88,9 @@ header {
 .archive h1 {
   margin: 0.35rem 0;
   font-size: clamp(1.7rem, 4vw, 2.6rem);
+  text-shadow:
+    0 1px 0 var(--paper),
+    0 2px 5px #3d2b2518;
 }
 .muted {
   color: var(--muted);
@@ -148,8 +154,11 @@ header {
   display: grid;
   touch-action: none;
   --cell-size: clamp(22px, min(3vw, 36px), 36px);
-  --clue-width: clamp(3.2rem, calc(var(--cell-size) * 1.7), 4.5rem);
-  --clue-height: clamp(2.4rem, calc(var(--cell-size) * 1.4), 3.2rem);
+  --clue-width: max(3.2rem, calc(var(--cell-size) * var(--row-clue-units)));
+  --clue-height: max(
+    2.4rem,
+    calc(var(--cell-size) * var(--max-col-depth) * 1.12)
+  );
   grid-template-columns: var(--clue-width) repeat(var(--cols), var(--cell-size));
   width: max-content;
   margin: auto;
@@ -170,6 +179,7 @@ header {
   align-items: center;
   font-weight: 800;
   line-height: 1.05;
+  white-space: nowrap;
 }
 .row-clues {
   height: var(--cell-size);
@@ -179,6 +189,8 @@ header {
   justify-content: end;
   padding-right: 0.8rem;
   font-weight: 800;
+  white-space: nowrap;
+  overflow: visible;
 }
 .cell {
   width: var(--cell-size);
@@ -264,6 +276,13 @@ header {
 .hint {
   color: var(--muted);
   text-align: center;
+  max-width: 44rem;
+  margin: 1rem auto 0;
+  padding: 0 0.5rem;
+  line-height: 1.45;
+  text-shadow:
+    0 1px 0 var(--paper),
+    0 1px 3px #3d2b2518;
 }
 .coarse-pointer-hint {
   display: none;
@@ -295,6 +314,8 @@ header {
 .completion > div,
 .result-state {
   background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 20px;
   padding: 2rem;
   max-width: 420px;
@@ -340,6 +361,9 @@ header {
   margin: 2rem 0;
   padding: 1.2rem;
   border-top: 1px solid var(--line);
+  text-shadow:
+    0 1px 0 var(--paper),
+    0 1px 3px #3d2b2518;
 }
 .stats strong {
   font-size: 1.5rem;
@@ -352,6 +376,72 @@ header {
   grid-column: 1/-1;
   margin-top: 1rem;
   color: var(--muted);
+}
+.stats-help {
+  text-align: left;
+  line-height: 1.45;
+}
+.achievements {
+  margin: 1.5rem 0 0;
+  padding: 1.2rem;
+  background: color-mix(in srgb, var(--paper) 86%, var(--accent));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 #5b42301a;
+}
+.achievements-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.achievements h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+.achievement-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.65rem;
+}
+.achievement {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-height: 4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.achievement.locked {
+  opacity: 0.62;
+}
+.achievement-mark {
+  display: grid;
+  flex: 0 0 1.5rem;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+}
+.achievement.locked .achievement-mark {
+  background: var(--line);
+  color: var(--muted);
+}
+.achievement strong,
+.achievement small {
+  display: block;
+}
+.achievement small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+  line-height: 1.3;
 }
 .notice,
 .penalty {
@@ -368,10 +458,27 @@ header {
   padding: 0.8rem 1rem;
 }
 .penalty {
-  top: 5.5rem;
-  padding: 0.55rem 0.8rem;
+  top: clamp(5.25rem, 13vh, 8rem);
+  display: grid;
+  gap: 0.1rem;
+  min-width: 10rem;
+  padding: 0.8rem 1.2rem;
+  text-align: center;
   background: #a33d50;
   animation: penalty-pop 1.3s ease both;
+}
+.penalty span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.penalty strong {
+  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  line-height: 1;
+  text-shadow:
+    0 2px 0 #6e2637,
+    0 3px 8px #30131c66;
 }
 @keyframes penalty-pop {
   from {
@@ -516,5 +623,8 @@ header {
   }
   .picross {
     margin-left: 0;
+  }
+  .row-clues {
+    padding-right: 0.45rem;
   }
 }
