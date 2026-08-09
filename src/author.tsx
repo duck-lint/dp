@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { analyzeBitmap, type PropagationRound } from './domain/puzzle-analysis';
+import {
+  analyzeBitmapStructure,
+  type PropagationRound,
+} from './domain/puzzle-analysis';
 import type { PuzzleDefinition } from './domain/puzzle';
 import seed from '../puzzles/seed.json';
 import './styles/author.css';
+import { useExactCardinality } from './authoring/use-exact-cardinality';
 
 const SIZE = 15;
 const blank = () => Array.from({ length: SIZE }, () => '0'.repeat(SIZE));
@@ -23,7 +27,8 @@ function Author() {
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const gesture = useRef<{ pointerId: number; mode: GestureMode } | null>(null);
-  const analysis = useMemo(() => analyzeBitmap(solution), [solution]);
+  const structure = useMemo(() => analyzeBitmapStructure(solution), [solution]);
+  const cardinality = useExactCardinality(structure.rows, structure.columns);
   const changedFromSource = Boolean(
     sourceId &&
     solution.join('\n') !==
@@ -177,13 +182,13 @@ function Author() {
           <div className="clues">
             <div>
               <strong>Rows</strong>
-              {analysis.rows.map((c, i) => (
+              {structure.rows.map((c, i) => (
                 <span key={i}>{c.join(' ')}</span>
               ))}
             </div>
             <div>
               <strong>Columns</strong>
-              {analysis.columns.map((c, i) => (
+              {structure.columns.map((c, i) => (
                 <span key={i}>{c.join(' ')}</span>
               ))}
             </div>
@@ -203,43 +208,47 @@ function Author() {
             <dt>Dimensions</dt>
             <dd>15×15</dd>
             <dt>Filled cells</dt>
-            <dd>{analysis.metrics.filledCells}</dd>
+            <dd>{structure.metrics.filledCells}</dd>
             <dt>Fill percentage</dt>
-            <dd>{analysis.metrics.fillPercentage.toFixed(1)}%</dd>
+            <dd>{structure.metrics.fillPercentage.toFixed(1)}%</dd>
             <dt>Unique solution</dt>
             <dd>
-              {analysis.cardinality.count === 1 ? 'yes' : 'no'} (
-              {analysis.cardinality.count === 2
-                ? '2+'
-                : analysis.cardinality.count}
-              )
+              {cardinality.status === 'pending' && 'pending…'}
+              {cardinality.status === 'checking' && 'checking…'}
+              {cardinality.status === 'error' && 'analysis error'}
+              {cardinality.status === 'ready' && (
+                <>
+                  {cardinality.count === 1 ? 'yes' : 'no'} (
+                  {cardinality.count === 2 ? '2+' : cardinality.count})
+                </>
+              )}
             </dd>
             <dt>No-guess line solve</dt>
-            <dd>{analysis.propagation.solved ? 'yes' : 'no'}</dd>
+            <dd>{structure.propagation.solved ? 'yes' : 'no'}</dd>
             <dt>Initial forced cells</dt>
-            <dd>{analysis.propagation.initialForcedCells}</dd>
+            <dd>{structure.propagation.initialForcedCells}</dd>
             <dt>Propagation rounds</dt>
-            <dd>{analysis.propagation.rounds.length}</dd>
+            <dd>{structure.propagation.rounds.length}</dd>
             <dt>Unresolved at stall</dt>
-            <dd>{analysis.propagation.unresolvedCells}</dd>
+            <dd>{structure.propagation.unresolvedCells}</dd>
             <dt>Filled components</dt>
-            <dd>{analysis.metrics.connectedComponents}</dd>
+            <dd>{structure.metrics.connectedComponents}</dd>
             <dt>Isolated pixels</dt>
-            <dd>{analysis.metrics.isolatedPixels}</dd>
+            <dd>{structure.metrics.isolatedPixels}</dd>
             <dt>Bounding box</dt>
             <dd>
-              {analysis.metrics.boundingBox
-                ? `${analysis.metrics.boundingBox.width}×${analysis.metrics.boundingBox.height}`
+              {structure.metrics.boundingBox
+                ? `${structure.metrics.boundingBox.width}×${structure.metrics.boundingBox.height}`
                 : 'none'}
             </dd>
             <dt>Margins</dt>
             <dd>
-              {Object.values(analysis.metrics.margins).join(' / ')} (T/B/L/R)
+              {Object.values(structure.metrics.margins).join(' / ')} (T/B/L/R)
             </dd>
           </dl>
           <div className="progression">
             <strong>Propagation progression</strong>
-            {analysis.propagation.rounds.map((r: PropagationRound) => (
+            {structure.propagation.rounds.map((r: PropagationRound) => (
               <div key={r.round}>
                 Round {r.round} — {r.forcedCells} cells forced,{' '}
                 {r.resolvedCells} resolved

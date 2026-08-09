@@ -58,6 +58,31 @@ test('authoring lab edits and clears a fixed 15x15 bitmap', async ({
   await expect(cells.nth(0)).toHaveAccessibleName(/empty/);
 });
 
+test('authoring remains interactive while exact analysis is pending', async ({
+  page,
+}) => {
+  await page.goto('/author.html');
+  const cells = page.locator('.author-editor button');
+
+  // A diagonal gives every line a single-cell clue, leaving many compatible
+  // boards. The test observes the worker boundary, not solver wall-clock cost.
+  for (let index = 0; index < 15; index++) await cells.nth(index * 16).click();
+  await expect(cells.nth(14 * 16)).toHaveAccessibleName(/filled/);
+  await expect(page.locator('.metrics')).toContainText('15');
+  await expect(
+    page.locator('.metrics').getByText(/pending|checking/),
+  ).toBeVisible();
+
+  await cells.nth(14 * 16).click();
+  await expect(cells.nth(14 * 16)).toHaveAccessibleName(/empty/);
+  await cells.nth(14 * 16).click();
+  await expect(cells.nth(14 * 16)).toHaveAccessibleName(/filled/);
+
+  await expect(
+    page.locator('.metrics dd').filter({ hasText: 'no (2+)' }),
+  ).toBeVisible({ timeout: 10000 });
+});
+
 test('authoring lab loads seeds and protects immutable identity on export', async ({
   page,
 }) => {
@@ -65,6 +90,9 @@ test('authoring lab loads seeds and protects immutable identity on export', asyn
   await page.goto('/author.html');
   await page.getByLabel('Load seed').selectOption('p-2026-08-08-r2');
   await expect(page.locator('.author-editor .filled')).toHaveCount(92);
+  await expect(
+    page.locator('.metrics dd').filter({ hasText: 'yes (1)' }),
+  ).toBeVisible({ timeout: 10000 });
   await page.locator('.author-editor button').nth(0).click();
   await expect(page.getByText(/solution changed/i)).toBeVisible();
   await expect(
