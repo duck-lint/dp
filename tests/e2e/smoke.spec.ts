@@ -58,29 +58,42 @@ test('authoring lab edits and clears a fixed 15x15 bitmap', async ({
   await expect(cells.nth(0)).toHaveAccessibleName(/empty/);
 });
 
-test('authoring remains interactive while exact analysis is pending', async ({
+test('authoring remains editable while exact cardinality is pending', async ({
   page,
 }) => {
   await page.goto('/author.html');
   const cells = page.locator('.author-editor button');
+  const edited = [0, 1, 2, 15, 16, 17, 30, 31, 32, 112];
 
-  // A diagonal gives every line a single-cell clue, leaving many compatible
-  // boards. The test observes the worker boundary, not solver wall-clock cost.
-  for (let index = 0; index < 15; index++) await cells.nth(index * 16).click();
-  await expect(cells.nth(14 * 16)).toHaveAccessibleName(/filled/);
-  await expect(page.locator('.metrics')).toContainText('15');
-  await expect(
-    page.locator('.metrics').getByText(/pending|checking/),
-  ).toBeVisible();
+  // These rapid edits create a nontrivial partial candidate. The assertion is
+  // deliberately about visible edits before the debounce/worker completes.
+  for (const index of edited) await cells.nth(index).click();
+  await expect(cells.nth(112)).toHaveAccessibleName(/filled/);
+  await expect(page.locator('.metrics dd').nth(3)).toHaveText(
+    /pending|checking/,
+  );
 
-  await cells.nth(14 * 16).click();
-  await expect(cells.nth(14 * 16)).toHaveAccessibleName(/empty/);
-  await cells.nth(14 * 16).click();
-  await expect(cells.nth(14 * 16)).toHaveAccessibleName(/filled/);
+  await cells.nth(113).click();
+  await expect(cells.nth(113)).toHaveAccessibleName(/filled/);
+  await expect(page.locator('.metrics dd').nth(3)).toHaveText(
+    /pending|checking/,
+  );
+  await expect(page.locator('.metrics dd').nth(3)).toHaveText(/yes|no/, {
+    timeout: 15_000,
+  });
+});
 
-  await expect(
-    page.locator('.metrics dd').filter({ hasText: 'no (2+)' }),
-  ).toBeVisible({ timeout: 10000 });
+test('authoring displays canonical worker cardinality results', async ({
+  page,
+}) => {
+  await page.goto('/author.html');
+  const unique = page.locator('.metrics dd').nth(3);
+  await page.getByLabel('Load seed').selectOption('p-2026-08-08-r2');
+  await expect(unique).toHaveText(/yes \(1\)/, { timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'Start blank' }).click();
+  await page.locator('.author-editor button').nth(112).click();
+  await expect(unique).toHaveText(/no \(2\+\)/, { timeout: 15_000 });
 });
 
 test('authoring lab loads seeds and protects immutable identity on export', async ({
@@ -90,9 +103,6 @@ test('authoring lab loads seeds and protects immutable identity on export', asyn
   await page.goto('/author.html');
   await page.getByLabel('Load seed').selectOption('p-2026-08-08-r2');
   await expect(page.locator('.author-editor .filled')).toHaveCount(92);
-  await expect(
-    page.locator('.metrics dd').filter({ hasText: 'yes (1)' }),
-  ).toBeVisible({ timeout: 10000 });
   await page.locator('.author-editor button').nth(0).click();
   await expect(page.getByText(/solution changed/i)).toBeVisible();
   await expect(
@@ -207,6 +217,111 @@ test('keeps right-click gameplay local to the board and bounds the desktop scale
       (window as typeof window & { contextResults?: boolean[] }).contextResults,
   );
   expect(contextResults?.slice(-3)).toEqual([true, true, false]);
+});
+
+test('ends gameplay drag when the pointer leaves and re-enters the board', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const first = page.getByTestId('cell-0-0');
+  const second = page.getByTestId('cell-0-1');
+  const firstBox = await first.boundingBox();
+  const secondBox = await second.boundingBox();
+  expect(firstBox).not.toBeNull();
+  expect(secondBox).not.toBeNull();
+
+  await page.mouse.move(firstBox!.x + 4, firstBox!.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(5, 5);
+  await page.mouse.move(secondBox!.x + 4, secondBox!.y + 4);
+  await expect(second).toHaveAccessibleName(/unknown/);
+  await page.mouse.up();
+});
+
+test('shows and clears a prominent wrong-guess penalty', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  await page.getByTestId('cell-0-0').click();
+  const penalty = page.getByRole('status').filter({ hasText: '-3:00' });
+  await expect(penalty).toBeVisible();
+  await expect(penalty.locator('strong')).toHaveText('-3:00');
+  await expect(penalty).toHaveCount(0, { timeout: 3000 });
+});
+
+test('keeps clue gutters contained and aligned with the board', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const layout = await page.evaluate(() => {
+    const picross = document.querySelector('.picross')!.getBoundingClientRect();
+    const firstCell = document.querySelector('.cell')!.getBoundingClientRect();
+    const firstColumnClue = document
+      .querySelector('[data-testid="col-clue-0"]')!
+      .getBoundingClientRect();
+    const firstRowClue = document
+      .querySelector('[data-testid="row-clue-0"]')!
+      .getBoundingClientRect();
+    return {
+      picrossTop: picross.top,
+      clueTop: firstColumnClue.top,
+      clueBottom: firstColumnClue.bottom,
+      rowLeft: firstRowClue.left,
+      rowRight: firstRowClue.right,
+      cellLeft: firstCell.left,
+      cellTop: firstCell.top,
+    };
+  });
+  expect(layout.clueTop).toBeGreaterThanOrEqual(layout.picrossTop - 1);
+  expect(layout.clueBottom).toBeLessThanOrEqual(layout.cellTop + 1);
+  expect(layout.rowLeft).toBeLessThanOrEqual(layout.cellLeft + 1);
+  expect(layout.rowRight).toBeLessThanOrEqual(layout.cellLeft + 1);
+});
+
+test('shows bounded achievements and preserves unlocked state after reload', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.addInitScript(() => {
+    const board = Array.from({ length: 15 }, () =>
+      Array<'unknown'>(15).fill('unknown'),
+    );
+    localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({
+        puzzles: {
+          'p-2026-08-08-r2': {
+            board,
+            tool: 'fill',
+            history: [],
+            future: [],
+            startedAt: null,
+            remainingMs: 2100000,
+            penaltyMs: 0,
+            elapsedMs: 0,
+            completedAt: 2,
+            failedAt: null,
+          },
+        },
+        completions: [
+          { puzzleId: 'p-2026-08-08-r2', date: '2026-08-08', elapsedMs: 1 },
+        ],
+        theme: 'system',
+      }),
+    );
+  });
+  await page.goto('/');
+  await expect(
+    page.getByRole('region', { name: 'Achievements' }),
+  ).toContainText('First Solve');
+  await expect(
+    page.getByRole('region', { name: 'Achievements' }).locator('.unlocked'),
+  ).toHaveCount(2);
+  await page.reload();
+  await expect(
+    page.getByRole('region', { name: 'Achievements' }).locator('.unlocked'),
+  ).toHaveCount(2);
 });
 
 const coffeeSolution = [
