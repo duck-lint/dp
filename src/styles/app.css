@@ -469,6 +469,7 @@ header {
   min-width: 10rem;
   padding: 0.8rem 1.2rem;
   text-align: center;
+  color: #fff;
   background: #a33d50;
   animation: penalty-pop 1.3s ease both;
 }
