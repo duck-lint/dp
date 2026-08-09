@@ -23,7 +23,9 @@ Available checks also include `npm run lint`, `npm run format:check`, `npm run t
 The development-only authoring lab is available while running `npm run dev` at
 `/author.html`. Draw or load a 15×15 candidate, inspect its clean silhouette and
 objective analysis, then copy the bitmap or complete candidate JSON for an
-ordinary reviewed corpus change. The lab never reads or writes gameplay
+ordinary reviewed corpus change. Clues and structural metrics update immediately;
+exact uniqueness is checked asynchronously after editing pauses, so a brief
+“checking…” state is expected. The lab never reads or writes gameplay
 persistence and is excluded from the production build.
 
 `npm run analyze:puzzles` prints the same raw analysis over the current seed

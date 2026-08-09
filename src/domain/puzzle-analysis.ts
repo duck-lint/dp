@@ -246,16 +246,23 @@ export const bitmapMetrics = (solution: string[]): BitmapMetrics => {
   };
 };
 
-export const analyzeBitmap = (solution: string[]) => {
+export const analyzeBitmapStructure = (solution: string[]) => {
   const rows = rowClues(solution);
   const columns = columnClues(solution);
-  const cardinality = countSolutions(rows, columns);
   const propagation = solveByLinePropagation(rows, columns);
   return {
     rows,
     columns,
-    cardinality,
     propagation,
     metrics: bitmapMetrics(solution),
+  };
+};
+
+/** Full analysis for batch tooling; interactive authoring uses a worker. */
+export const analyzeBitmap = (solution: string[]) => {
+  const structure = analyzeBitmapStructure(solution);
+  return {
+    ...structure,
+    cardinality: countSolutions(structure.rows, structure.columns),
   };
 };
