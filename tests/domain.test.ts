@@ -172,9 +172,9 @@ describe('picross domain', () => {
     ];
     const achievements = deriveAchievements(completions, 1, 7);
 
-    expect(achievements.find((item) => item.id === 'first-solve')?.unlocked).toBe(
-      true,
-    );
+    expect(
+      achievements.find((item) => item.id === 'first-solve')?.unlocked,
+    ).toBe(true);
     expect(achievements.find((item) => item.id === 'streak-3')?.unlocked).toBe(
       true,
     );
