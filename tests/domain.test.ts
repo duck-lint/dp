@@ -11,6 +11,7 @@ import {
 } from '../src/domain/game-state';
 import { isSolved, makeBoard } from '../src/domain/puzzle';
 import { deriveStatistics } from '../src/domain/statistics';
+import { deriveAchievements } from '../src/domain/achievements';
 import { solvePicross } from '../src/domain/solver';
 import {
   analyzeBitmap,
@@ -137,6 +138,50 @@ describe('picross domain', () => {
       averageMs: 2000,
       fastestMs: 1000,
     });
+  });
+  it('derives bounded achievements from local completion records', () => {
+    const completions = [
+      { puzzleId: 'first', date: '2026-08-06', elapsedMs: 1000 },
+      { puzzleId: 'second', date: '2026-08-07', elapsedMs: 2000 },
+    ];
+    const achievements = deriveAchievements(completions, 2, 3);
+    expect(
+      achievements.find((item) => item.id === 'first-solve')?.unlocked,
+    ).toBe(true);
+    expect(achievements.find((item) => item.id === 'streak-3')?.unlocked).toBe(
+      true,
+    );
+    expect(
+      achievements.find((item) => item.id === 'three-solves')?.unlocked,
+    ).toBe(false);
+    expect(achievements.find((item) => item.id === 'explorer')?.unlocked).toBe(
+      false,
+    );
+  });
+  it('derives completion milestones from unique completion IDs and streaks', () => {
+    const completions = [
+      { puzzleId: 'a', date: '2026-08-06', elapsedMs: 1000 },
+      { puzzleId: 'b', date: '2026-08-07', elapsedMs: 2000 },
+      { puzzleId: 'c', date: '2026-08-08', elapsedMs: 3000 },
+      { puzzleId: 'c', date: '2026-08-08', elapsedMs: 3000 },
+    ];
+    const achievements = deriveAchievements(completions, 1, 7);
+
+    expect(
+      achievements.find((item) => item.id === 'first-solve')?.unlocked,
+    ).toBe(true);
+    expect(achievements.find((item) => item.id === 'streak-3')?.unlocked).toBe(
+      true,
+    );
+    expect(achievements.find((item) => item.id === 'streak-7')?.unlocked).toBe(
+      true,
+    );
+    expect(
+      achievements.find((item) => item.id === 'three-solves')?.unlocked,
+    ).toBe(true);
+    expect(achievements.find((item) => item.id === 'explorer')?.unlocked).toBe(
+      false,
+    );
   });
   it('distinguishes unsolvable, unique, and ambiguous line systems', () => {
     expect(solvePicross([[2]], [[1], [0]]).count).toBe(0);
