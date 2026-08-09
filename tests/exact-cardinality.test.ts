@@ -73,7 +73,7 @@ describe('exact cardinality orchestration', () => {
     expect(states.at(-1)).toEqual({ status: 'ready', count: 2 });
   });
 
-  it('recovers from worker errors on the next request', () => {
+  it('terminates a worker after a successful result', () => {
     const states: ExactCardinalityState[] = [];
     const created: FakeWorker[] = [];
     const coordinator = createExactCardinalityCoordinator({
@@ -88,11 +88,61 @@ describe('exact cardinality orchestration', () => {
 
     coordinator.update([[1]], [[1]]);
     vi.runOnlyPendingTimers();
-    created[0].onerror?.({} as ErrorEvent);
+    const first = created[0];
+    first.onmessage?.({ data: { count: 1 } } as MessageEvent);
+
+    expect(first.terminate).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toEqual({ status: 'ready', count: 1 });
+
+    coordinator.update([[0]], [[0]]);
+    vi.runOnlyPendingTimers();
+    expect(created).toHaveLength(2);
+    expect(first.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('terminates a worker after an error and allows a fresh request', () => {
+    const states: ExactCardinalityState[] = [];
+    const created: FakeWorker[] = [];
+    const coordinator = createExactCardinalityCoordinator({
+      debounceMs: 0,
+      createWorker: () => {
+        const next = worker();
+        created.push(next);
+        return next;
+      },
+      onState: (state) => states.push(state),
+    });
+
+    coordinator.update([[1]], [[1]]);
+    vi.runOnlyPendingTimers();
+    const first = created[0];
+    first.onerror?.({} as ErrorEvent);
+
+    expect(first.terminate).toHaveBeenCalledTimes(1);
     expect(states.at(-1)).toEqual({ status: 'error' });
 
     coordinator.update([[0]], [[0]]);
     vi.runOnlyPendingTimers();
+    expect(created).toHaveLength(2);
     expect(states.at(-1)).toEqual({ status: 'checking' });
+  });
+
+  it('recovers from a synchronous dispatch failure', () => {
+    const states: ExactCardinalityState[] = [];
+    const failed = worker();
+    failed.postMessage.mockImplementation(() => {
+      throw new Error('clone failed');
+    });
+    const coordinator = createExactCardinalityCoordinator({
+      debounceMs: 0,
+      createWorker: () => failed,
+      onState: (state) => states.push(state),
+    });
+
+    coordinator.update([[1]], [[1]]);
+    vi.runOnlyPendingTimers();
+
+    expect(failed.terminate).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toEqual({ status: 'error' });
   });
 });
