@@ -92,6 +92,7 @@ test('authoring displays canonical worker cardinality results', async ({
   await expect(unique).toHaveText(/yes \(1\)/, { timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Start blank' }).click();
+  await expect(page.locator('.author-editor .filled')).toHaveCount(0);
   await page.locator('.author-editor button').nth(112).click();
   await expect(unique).toHaveText(/no \(2\+\)/, { timeout: 15_000 });
 });
