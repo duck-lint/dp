@@ -79,11 +79,10 @@ function App() {
     () =>
       deriveAchievements(
         data.completions,
-        data.puzzles,
         stats.currentStreak,
         stats.bestStreak,
       ),
-    [data.completions, data.puzzles, stats.currentStreak, stats.bestStreak],
+    [data.completions, stats.currentStreak, stats.bestStreak],
   );
 
   useEffect(() => {
