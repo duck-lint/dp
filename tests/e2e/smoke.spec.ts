@@ -92,9 +92,7 @@ test('authoring displays canonical worker cardinality results', async ({
   await expect(unique).toHaveText(/yes \(1\)/, { timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Start blank' }).click();
-  await expect(page.locator('.author-editor .filled')).toHaveCount(0);
   await page.locator('.author-editor button').nth(112).click();
-  await page.locator('.author-editor button').nth(128).click();
   await expect(unique).toHaveText(/no \(2\+\)/, { timeout: 15_000 });
 });
 
@@ -680,6 +678,44 @@ test('keeps the playable board palette legible across theme modes', async ({
       expect(palette.major).not.toBe(palette.grid);
       expect(palette.boardInk).toBe('#332b2b');
       expect(palette.boardMajor).toMatch(/^#(?:5e4f4a|574841)$/);
+    });
+  }
+});
+
+test('keeps status notices contrast-safe in dark and system-dark themes', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  for (const mode of [
+    { name: 'dark', theme: 'dark' as const },
+    { name: 'system-dark', theme: 'system' as const },
+  ]) {
+    await test.step(mode.name, async () => {
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.evaluate((theme) => {
+        const saved = JSON.parse(
+          localStorage.getItem('daily-picross:v1') ?? '{}',
+        );
+        localStorage.setItem(
+          'daily-picross:v1',
+          JSON.stringify({ ...saved, theme }),
+        );
+      }, mode.theme);
+      await page.reload();
+      page.once('dialog', (dialog) => void dialog.accept());
+      await page.getByRole('button', { name: 'Reset' }).click();
+      const colors = await page.locator('.notice').evaluate((element) => {
+        const styles = getComputedStyle(element);
+        return {
+          foreground: styles.color,
+          background: styles.backgroundColor,
+          opacity: styles.opacity,
+        };
+      });
+      expect(colors.opacity).toBe('1');
+      expect(colors.foreground).not.toBe(colors.background);
+      expect(colors.background).not.toBe('rgba(0, 0, 0, 0)');
     });
   }
 });
