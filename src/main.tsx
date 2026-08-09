@@ -62,6 +62,7 @@ function App() {
   const state = selected
     ? (data.puzzles[selected.id] ?? empty(selected))
     : null;
+  const previousPuzzleId = useRef(selected?.id);
   const previousPenalty = useRef(state?.penaltyMs ?? 0);
   const completed = Boolean(
     selected && state && isSolved(selected, state.board),
@@ -87,6 +88,12 @@ function App() {
 
   useEffect(() => {
     const penaltyMs = state?.penaltyMs ?? 0;
+    if (previousPuzzleId.current !== selected?.id) {
+      previousPuzzleId.current = selected?.id;
+      previousPenalty.current = penaltyMs;
+      setPenaltyFeedback(null);
+      return;
+    }
     if (penaltyMs <= previousPenalty.current) {
       previousPenalty.current = penaltyMs;
       return;
@@ -95,7 +102,7 @@ function App() {
     setPenaltyFeedback(penaltyMs);
     const id = window.setTimeout(() => setPenaltyFeedback(null), 1500);
     return () => window.clearTimeout(id);
-  }, [state?.penaltyMs]);
+  }, [selected?.id, state?.penaltyMs]);
 
   // The celebration is a transient presentation event, not a projection of
   // persistent completion. Navigation and puzzle changes cancel it entirely.
