@@ -654,34 +654,12 @@ function Game({
   const rows = rowClues(puzzle.solution);
   const cols = columnClues(puzzle.solution);
   const [touchTool, setTouchTool] = useState<Tool>('fill');
+  const [activeCell, setActiveCell] = useState<{ y: number; x: number } | null>(
+    null,
+  );
   const drag = useRef<Drag | null>(null);
-  const picrossRef = useRef<HTMLDivElement>(null);
   const asLine = (line: CellState[]): string[] =>
     line.map((cell) => (cell === 'filled' ? '1' : '0'));
-  const setActiveCell = (y: number, x: number) => {
-    const element = picrossRef.current;
-    if (!element) return;
-    element
-      .querySelectorAll('.active-row, .active-col')
-      .forEach((item) => item.classList.remove('active-row', 'active-col'));
-    element.dataset.activeRow = String(y);
-    element.dataset.activeCol = String(x);
-    element
-      .querySelectorAll(`[data-row="${y}"]`)
-      .forEach((item) => item.classList.add('active-row'));
-    element
-      .querySelectorAll(`[data-col="${x}"]`)
-      .forEach((item) => item.classList.add('active-col'));
-  };
-  const clearActiveCell = () => {
-    const element = picrossRef.current;
-    if (!element) return;
-    element
-      .querySelectorAll('.active-row, .active-col')
-      .forEach((item) => item.classList.remove('active-row', 'active-col'));
-    element.removeAttribute('data-active-row');
-    element.removeAttribute('data-active-col');
-  };
   useEffect(() => {
     const cancel = () => {
       drag.current = null;
@@ -815,7 +793,7 @@ function Game({
         className="grid-wrap"
         onPointerLeave={() => {
           end();
-          clearActiveCell();
+          setActiveCell(null);
         }}
         onPointerUp={end}
         onPointerCancel={end}
@@ -825,7 +803,6 @@ function Game({
         }}
       >
         <div
-          ref={picrossRef}
           className="picross"
           style={
             {
@@ -844,7 +821,7 @@ function Game({
             {cols.map((clue, x) => (
               <div
                 key={x}
-                className={`clue-line ${lineSatisfied(asLine(state.board.map((row) => row[x])), clue) ? 'satisfied' : ''}`}
+                className={`clue-line ${lineSatisfied(asLine(state.board.map((row) => row[x])), clue) ? 'satisfied' : ''} ${activeCell?.x === x ? 'active-col' : ''}`}
                 data-col={x}
                 data-testid={`col-clue-${x}`}
               >
@@ -857,7 +834,7 @@ function Game({
           {rows.map((clue, y) => (
             <React.Fragment key={y}>
               <div
-                className={`row-clues ${lineSatisfied(asLine(state.board[y]), clue) ? 'satisfied' : ''}`}
+                className={`row-clues ${lineSatisfied(asLine(state.board[y]), clue) ? 'satisfied' : ''} ${activeCell?.y === y ? 'active-row' : ''}`}
                 data-row={y}
                 data-testid={`row-clue-${y}`}
               >
@@ -866,7 +843,7 @@ function Game({
               {state.board[y].map((cell, x) => (
                 <button
                   key={x}
-                  className={`cell ${cell} ${(x + 1) % 5 === 0 ? 'major-x' : ''} ${(y + 1) % 5 === 0 ? 'major-y' : ''}`}
+                  className={`cell ${cell} ${activeCell?.y === y ? 'active-row' : ''} ${activeCell?.x === x ? 'active-col' : ''} ${(x + 1) % 5 === 0 ? 'major-x' : ''} ${(y + 1) % 5 === 0 ? 'major-y' : ''}`}
                   aria-label={`Row ${y + 1}, column ${x + 1}, ${cell}`}
                   data-testid={`cell-${y}-${x}`}
                   data-col={x}
@@ -883,7 +860,7 @@ function Game({
                         event.relatedTarget as Node | null,
                       )
                     )
-                      clearActiveCell();
+                      setActiveCell(null);
                   }}
                   onPointerUp={end}
                   onPointerCancel={end}
