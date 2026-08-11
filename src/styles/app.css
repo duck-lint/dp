@@ -215,6 +215,18 @@ header {
   border-color: var(--board-grid);
   background: transparent;
 }
+.picross .active-row.cell,
+.picross .active-col.cell {
+  outline: 2px solid #d59b38;
+  outline-offset: -2px;
+}
+.picross .active-row.row-clues,
+.picross .active-col.clue-line {
+  background: color-mix(in srgb, #d59b38 18%, transparent);
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-decoration-color: #d59b38;
+}
 .cell.filled {
   background: var(--accent);
   color: transparent;
