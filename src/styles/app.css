@@ -220,6 +220,10 @@ header {
   outline: 2px solid #d59b38;
   outline-offset: -2px;
 }
+.picross .cell:focus-visible {
+  outline: 3px solid #d59b38;
+  outline-offset: 2px;
+}
 .picross .active-row.row-clues,
 .picross .active-col.clue-line {
   background: color-mix(in srgb, #d59b38 18%, transparent);
