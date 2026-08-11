@@ -284,6 +284,19 @@ test('shows and clears a prominent wrong-guess penalty', async ({ page }) => {
   await expect(penalty).toHaveCount(0, { timeout: 3000 });
 });
 
+test('marks a satisfied row reactively as its cells change', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const rowClue = page.getByTestId('row-clue-0');
+  await expect(rowClue).not.toHaveClass(/satisfied/);
+
+  for (const x of [6, 7, 8]) await page.getByTestId(`cell-0-${x}`).click();
+  await expect(rowClue).toHaveClass(/satisfied/);
+
+  await page.getByTestId('cell-0-7').click();
+  await expect(rowClue).not.toHaveClass(/satisfied/);
+});
+
 test('keeps clue gutters contained and aligned with the board', async ({
   page,
 }) => {
