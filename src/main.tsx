@@ -514,6 +514,16 @@ function App() {
             <span>current streak</span>
             <strong>{stats.bestStreak}</strong>
             <span>best streak</span>
+            <strong>
+              {stats.total ? formatDuration(stats.averageMs) : '—'}
+            </strong>
+            <span>average time</span>
+            <strong>
+              {stats.total && stats.fastestMs !== null
+                ? formatDuration(stats.fastestMs)
+                : '—'}
+            </strong>
+            <span>best time</span>
             <small className="stats-help">
               Streaks count consecutive published puzzle dates completed;
               solving an archive puzzle can repair a gap.
