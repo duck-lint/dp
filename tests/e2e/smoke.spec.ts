@@ -141,6 +141,20 @@ test('opens the daily puzzle and archive', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
 });
 
+test('falls back to the latest published puzzle when today is unpublished', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-20T12:00:00Z') });
+  await page.goto('/');
+  await expect(page.getByText('Archive puzzle')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /August 19, 2026/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'No puzzle published for this date' }),
+  ).toHaveCount(0);
+});
+
 test('rejects an incompatible persisted board before rendering the game', async ({
   page,
 }) => {
@@ -253,17 +267,20 @@ test('shows and clears a prominent wrong-guess penalty', async ({ page }) => {
   const penalty = page.getByRole('status').filter({ hasText: '-3:00' });
   await expect(penalty).toBeVisible();
   await expect(penalty.locator('strong')).toHaveText('-3:00');
-  const colors = await penalty.evaluate((element) => {
-    const styles = getComputedStyle(element);
-    return {
-      foreground: styles.color,
-      background: styles.backgroundColor,
-    };
-  });
-  expect(colors).toEqual({
-    foreground: 'rgb(255, 255, 255)',
-    background: 'rgb(163, 61, 80)',
-  });
+  await expect
+    .poll(() =>
+      penalty.evaluate((element) => {
+        const styles = getComputedStyle(element);
+        return {
+          foreground: styles.color,
+          background: styles.backgroundColor,
+        };
+      }),
+    )
+    .toEqual({
+      foreground: 'rgb(255, 255, 255)',
+      background: 'rgb(163, 61, 80)',
+    });
   await expect(penalty).toHaveCount(0, { timeout: 3000 });
 });
 
