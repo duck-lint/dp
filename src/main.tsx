@@ -6,7 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { createRoot } from 'react-dom/client';
-import { columnClues, rowClues } from './domain/clues';
+import { columnClues, lineSatisfied, rowClues } from './domain/clues';
 import { deriveAchievements } from './domain/achievements';
 import { choosePuzzle, localDateKey, formatDate } from './domain/dates';
 import {
@@ -22,7 +22,11 @@ import {
   type Tool,
 } from './domain/game-state';
 import { formatDuration } from './domain/format';
-import { isSolved, type PuzzleDefinition } from './domain/puzzle';
+import {
+  isSolved,
+  type CellState,
+  type PuzzleDefinition,
+} from './domain/puzzle';
 import { deriveStatistics } from './domain/statistics';
 import {
   emptySaved,
@@ -640,6 +644,8 @@ function Game({
   const cols = columnClues(puzzle.solution);
   const [touchTool, setTouchTool] = useState<Tool>('fill');
   const drag = useRef<Drag | null>(null);
+  const asLine = (line: CellState[]): string[] =>
+    line.map((cell) => (cell === 'filled' ? '1' : '0'));
   useEffect(() => {
     const cancel = () => {
       drag.current = null;
@@ -798,7 +804,8 @@ function Game({
             {cols.map((clue, x) => (
               <div
                 key={x}
-                className="clue-line"
+                className={`clue-line ${lineSatisfied(asLine(state.board.map((row) => row[x])), clue) ? 'satisfied' : ''}`}
+                data-col={x}
                 data-testid={`col-clue-${x}`}
               >
                 {clue.map((number, i) => (
@@ -810,7 +817,8 @@ function Game({
           {rows.map((clue, y) => (
             <React.Fragment key={y}>
               <div
-                className="row-clues"
+                className={`row-clues ${lineSatisfied(asLine(state.board[y]), clue) ? 'satisfied' : ''}`}
+                data-row={y}
                 data-testid={`row-clue-${y}`}
               >
                 <span>{clue.join(' ')}</span>
