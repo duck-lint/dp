@@ -850,10 +850,10 @@ function Game({
                   data-row={y}
                   onPointerDown={(event) => begin(event, y, x)}
                   onPointerEnter={() => {
-                    setActiveCell(y, x);
+                    setActiveCell({ y, x });
                     enter(y, x);
                   }}
-                  onFocus={() => setActiveCell(y, x)}
+                  onFocus={() => setActiveCell({ y, x })}
                   onBlur={(event) => {
                     if (
                       !event.currentTarget.parentElement?.contains(
