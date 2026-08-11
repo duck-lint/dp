@@ -146,7 +146,7 @@ test('falls back to the latest published puzzle when today is unpublished', asyn
 }) => {
   await page.clock.install({ time: new Date('2026-08-20T12:00:00Z') });
   await page.goto('/');
-  await expect(page.getByText('Archive puzzle')).toBeVisible();
+  await expect(page.locator('.intro .muted')).toContainText('Archive puzzle');
   await expect(
     page.getByRole('heading', { name: /Aug 19, 2026/ }),
   ).toBeVisible();
@@ -289,13 +289,13 @@ test('marks a satisfied row reactively as its cells change', async ({
 }) => {
   await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
   await page.goto('/');
-  const rowClue = page.getByTestId('row-clue-0');
+  const rowClue = page.getByTestId('row-clue-1');
   await expect(rowClue).not.toHaveClass(/satisfied/);
 
-  for (const x of [6, 7, 8]) await page.getByTestId(`cell-0-${x}`).click();
+  for (const x of [6, 7, 8]) await page.getByTestId(`cell-1-${x}`).click();
   await expect(rowClue).toHaveClass(/satisfied/);
 
-  await page.getByTestId('cell-0-7').click();
+  await page.getByTestId('cell-1-7').click();
   await expect(rowClue).not.toHaveClass(/satisfied/);
 });
 
@@ -330,7 +330,7 @@ test('shows placeholders before completion and formatted solve times after compl
   await page.goto('/');
   await expect(page.locator('.stats')).toContainText('—');
 
-  await page.addInitScript(() => {
+  await page.evaluate(() => {
     localStorage.setItem(
       'daily-picross:v1',
       JSON.stringify({
