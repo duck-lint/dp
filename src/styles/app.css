@@ -181,6 +181,13 @@ header {
   line-height: 1.05;
   white-space: nowrap;
 }
+.clue-line.satisfied,
+.row-clues.satisfied {
+  opacity: 0.62;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+}
 .row-clues {
   height: var(--cell-size);
   width: var(--clue-width);
