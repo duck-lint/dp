@@ -317,6 +317,31 @@ test('highlights the active row, column, and clue lines', async ({ page }) => {
   await expect(page.locator('.picross .active-row, .picross .active-col')).toHaveCount(0);
 });
 
+test('shows placeholders before completion and formatted solve times after completion', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  await expect(page.locator('.stats')).toContainText('—');
+
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({
+        theme: 'light',
+        puzzles: {},
+        completions: [
+          { puzzleId: 'one', date: '2026-08-06', elapsedMs: 125000 },
+          { puzzleId: 'two', date: '2026-08-07', elapsedMs: 90000 },
+        ],
+      }),
+    );
+  });
+  await page.reload();
+  await expect(page.locator('.stats')).toContainText('1:47');
+  await expect(page.locator('.stats')).toContainText('1:30');
+});
+
 test('keeps clue gutters contained and aligned with the board', async ({
   page,
 }) => {
