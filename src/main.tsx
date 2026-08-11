@@ -644,8 +644,33 @@ function Game({
   const cols = columnClues(puzzle.solution);
   const [touchTool, setTouchTool] = useState<Tool>('fill');
   const drag = useRef<Drag | null>(null);
+  const picrossRef = useRef<HTMLDivElement>(null);
   const asLine = (line: CellState[]): string[] =>
     line.map((cell) => (cell === 'filled' ? '1' : '0'));
+  const setActiveCell = (y: number, x: number) => {
+    const element = picrossRef.current;
+    if (!element) return;
+    element
+      .querySelectorAll('.active-row, .active-col')
+      .forEach((item) => item.classList.remove('active-row', 'active-col'));
+    element.dataset.activeRow = String(y);
+    element.dataset.activeCol = String(x);
+    element
+      .querySelectorAll(`[data-row="${y}"]`)
+      .forEach((item) => item.classList.add('active-row'));
+    element
+      .querySelectorAll(`[data-col="${x}"]`)
+      .forEach((item) => item.classList.add('active-col'));
+  };
+  const clearActiveCell = () => {
+    const element = picrossRef.current;
+    if (!element) return;
+    element
+      .querySelectorAll('.active-row, .active-col')
+      .forEach((item) => item.classList.remove('active-row', 'active-col'));
+    element.removeAttribute('data-active-row');
+    element.removeAttribute('data-active-col');
+  };
   useEffect(() => {
     const cancel = () => {
       drag.current = null;
@@ -777,7 +802,10 @@ function Game({
       </div>
       <div
         className="grid-wrap"
-        onPointerLeave={end}
+        onPointerLeave={() => {
+          end();
+          clearActiveCell();
+        }}
         onPointerUp={end}
         onPointerCancel={end}
         onContextMenuCapture={(event) => event.preventDefault()}
@@ -786,6 +814,7 @@ function Game({
         }}
       >
         <div
+          ref={picrossRef}
           className="picross"
           style={
             {
@@ -829,8 +858,22 @@ function Game({
                   className={`cell ${cell} ${(x + 1) % 5 === 0 ? 'major-x' : ''} ${(y + 1) % 5 === 0 ? 'major-y' : ''}`}
                   aria-label={`Row ${y + 1}, column ${x + 1}, ${cell}`}
                   data-testid={`cell-${y}-${x}`}
+                  data-col={x}
+                  data-row={y}
                   onPointerDown={(event) => begin(event, y, x)}
-                  onPointerEnter={() => enter(y, x)}
+                  onPointerEnter={() => {
+                    setActiveCell(y, x);
+                    enter(y, x);
+                  }}
+                  onFocus={() => setActiveCell(y, x)}
+                  onBlur={(event) => {
+                    if (
+                      !event.currentTarget.parentElement?.contains(
+                        event.relatedTarget as Node | null,
+                      )
+                    )
+                      clearActiveCell();
+                  }}
                   onPointerUp={end}
                   onPointerCancel={end}
                   onContextMenu={(event) => event.preventDefault()}
