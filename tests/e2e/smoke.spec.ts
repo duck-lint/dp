@@ -284,7 +284,9 @@ test('shows and clears a prominent wrong-guess penalty', async ({ page }) => {
   await expect(penalty).toHaveCount(0, { timeout: 3000 });
 });
 
-test('marks a satisfied row reactively as its cells change', async ({ page }) => {
+test('marks a satisfied row reactively as its cells change', async ({
+  page,
+}) => {
   await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
   await page.goto('/');
   const rowClue = page.getByTestId('row-clue-0');
@@ -311,10 +313,14 @@ test('highlights the active row, column, and clue lines', async ({ page }) => {
   await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
   await expect(page.getByTestId('cell-4-5')).toHaveClass(/active-row/);
   await expect(page.getByTestId('cell-3-6')).toHaveClass(/active-col/);
-  await expect(page.getByTestId('cell-3-5')).not.toHaveClass(/active-row|active-col/);
+  await expect(page.getByTestId('cell-3-5')).not.toHaveClass(
+    /active-row|active-col/,
+  );
 
   await page.mouse.move(4, 4);
-  await expect(page.locator('.picross .active-row, .picross .active-col')).toHaveCount(0);
+  await expect(
+    page.locator('.picross .active-row, .picross .active-col'),
+  ).toHaveCount(0);
 });
 
 test('shows placeholders before completion and formatted solve times after completion', async ({
