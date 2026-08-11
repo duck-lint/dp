@@ -20,6 +20,7 @@ import {
   type GameState,
   type MarkCommand,
   type Tool,
+  WRONG_MARK_PENALTY_MS,
 } from './domain/game-state';
 import { formatDuration } from './domain/format';
 import {
@@ -575,7 +576,7 @@ function PenaltyBadge() {
   return (
     <div className="penalty" role="status" aria-live="assertive">
       <span>Time penalty</span>
-      <strong>-3:00</strong>
+      <strong>-{formatDuration(WRONG_MARK_PENALTY_MS)}</strong>
     </div>
   );
 }
