@@ -375,7 +375,7 @@ header {
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.2rem 1rem;
   margin: 2rem 0;
   padding: 1.2rem;
