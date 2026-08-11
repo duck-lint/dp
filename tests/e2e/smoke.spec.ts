@@ -323,6 +323,62 @@ test('highlights the active row, column, and clue lines', async ({ page }) => {
   ).toHaveCount(0);
 });
 
+test('preserves active projection through board rerenders', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const active = page.getByTestId('cell-4-6');
+  await active.hover();
+
+  await active.click();
+  await expect(active).toHaveClass(/active-row/);
+  await expect(active).toHaveClass(/active-col/);
+  await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-4-5')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-3-6')).toHaveClass(/active-col/);
+
+  await page.getByTestId('cell-4-7').hover();
+  await expect(page.getByTestId('cell-4-7')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-4-7')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-4-6')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-4-6')).not.toHaveClass(/active-col/);
+});
+
+test('keeps focus-visible distinct while keyboard navigation moves active lines', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const focused = page.getByTestId('cell-4-6');
+  await focused.focus();
+
+  await expect(focused).toHaveClass(/active-row/);
+  await expect(focused).toHaveClass(/active-col/);
+  await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
+  await expect
+    .poll(() => focused.evaluate((element) => getComputedStyle(element).outlineWidth))
+    .toBe('3px');
+  await expect
+    .poll(() =>
+      page
+        .getByTestId('cell-4-5')
+        .evaluate((element) => getComputedStyle(element).outlineWidth),
+    )
+    .toBe('2px');
+
+  await focused.press('ArrowRight');
+  const next = page.getByTestId('cell-4-7');
+  await expect(next).toBeFocused();
+  await expect(next).toHaveClass(/active-row/);
+  await expect(next).toHaveClass(/active-col/);
+  await expect(page.getByTestId('col-clue-7')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('col-clue-6')).not.toHaveClass(/active-col/);
+
+  await page.getByRole('button', { name: 'Reset' }).focus();
+  await expect(page.locator('.picross .active-row, .picross .active-col')).toHaveCount(0);
+});
+
 test('shows placeholders before completion and formatted solve times after completion', async ({
   page,
 }) => {
