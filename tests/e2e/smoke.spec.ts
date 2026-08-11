@@ -148,7 +148,7 @@ test('falls back to the latest published puzzle when today is unpublished', asyn
   await page.goto('/');
   await expect(page.getByText('Archive puzzle')).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: /August 19, 2026/ }),
+    page.getByRole('heading', { name: /Aug 19, 2026/ }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'No puzzle published for this date' }),
