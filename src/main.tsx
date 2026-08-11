@@ -8,7 +8,7 @@ import React, {
 import { createRoot } from 'react-dom/client';
 import { columnClues, rowClues } from './domain/clues';
 import { deriveAchievements } from './domain/achievements';
-import { localDateKey, formatDate } from './domain/dates';
+import { choosePuzzle, localDateKey, formatDate } from './domain/dates';
 import {
   applyCell,
   checkpointTimer,
@@ -34,7 +34,7 @@ import { allPuzzles } from './puzzles';
 import './styles/app.css';
 
 const today = localDateKey();
-const current = allPuzzles.find((p) => p.publishDate === today);
+const current = choosePuzzle(allPuzzles, today);
 const empty = (p: PuzzleDefinition): GameState =>
   initialGame(p.width, p.height);
 const cycleTheme = (theme: SavedData['theme']): SavedData['theme'] =>
@@ -796,7 +796,11 @@ function Game({
           <div className="corner" />
           <div className="col-clues">
             {cols.map((clue, x) => (
-              <div key={x} className="clue-line" data-testid={`col-clue-${x}`}>
+              <div
+                key={x}
+                className="clue-line"
+                data-testid={`col-clue-${x}`}
+              >
                 {clue.map((number, i) => (
                   <span key={i}>{number}</span>
                 ))}
@@ -805,7 +809,10 @@ function Game({
           </div>
           {rows.map((clue, y) => (
             <React.Fragment key={y}>
-              <div className="row-clues" data-testid={`row-clue-${y}`}>
+              <div
+                className="row-clues"
+                data-testid={`row-clue-${y}`}
+              >
                 <span>{clue.join(' ')}</span>
               </div>
               {state.board[y].map((cell, x) => (
