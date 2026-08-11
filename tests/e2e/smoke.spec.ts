@@ -337,8 +337,16 @@ test('shows placeholders before completion and formatted solve times after compl
         theme: 'light',
         puzzles: {},
         completions: [
-          { puzzleId: 'one', date: '2026-08-06', elapsedMs: 125000 },
-          { puzzleId: 'two', date: '2026-08-07', elapsedMs: 90000 },
+          {
+            puzzleId: 'p-2026-08-06-r2',
+            date: '2026-08-06',
+            elapsedMs: 125000,
+          },
+          {
+            puzzleId: 'p-2026-08-07-r2',
+            date: '2026-08-07',
+            elapsedMs: 90000,
+          },
         ],
       }),
     );
