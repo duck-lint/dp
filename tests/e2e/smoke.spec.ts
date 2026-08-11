@@ -297,6 +297,26 @@ test('marks a satisfied row reactively as its cells change', async ({ page }) =>
   await expect(rowClue).not.toHaveClass(/satisfied/);
 });
 
+test('highlights the active row, column, and clue lines', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const active = page.getByTestId('cell-4-6');
+  const box = await active.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + 4, box!.y + 4);
+
+  await expect(active).toHaveClass(/active-row/);
+  await expect(active).toHaveClass(/active-col/);
+  await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-4-5')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-3-6')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-3-5')).not.toHaveClass(/active-row|active-col/);
+
+  await page.mouse.move(4, 4);
+  await expect(page.locator('.picross .active-row, .picross .active-col')).toHaveCount(0);
+});
+
 test('keeps clue gutters contained and aligned with the board', async ({
   page,
 }) => {
