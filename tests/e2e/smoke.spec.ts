@@ -323,7 +323,9 @@ test('highlights the active row, column, and clue lines', async ({ page }) => {
   ).toHaveCount(0);
 });
 
-test('preserves active projection through board rerenders', async ({ page }) => {
+test('preserves active projection through board rerenders', async ({
+  page,
+}) => {
   await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
   await page.goto('/');
   const active = page.getByTestId('cell-4-6');
@@ -357,7 +359,9 @@ test('keeps focus-visible distinct while keyboard navigation moves active lines'
   await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
   await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
   await expect
-    .poll(() => focused.evaluate((element) => getComputedStyle(element).outlineWidth))
+    .poll(() =>
+      focused.evaluate((element) => getComputedStyle(element).outlineWidth),
+    )
     .toBe('3px');
   await expect
     .poll(() =>
@@ -376,7 +380,9 @@ test('keeps focus-visible distinct while keyboard navigation moves active lines'
   await expect(page.getByTestId('col-clue-6')).not.toHaveClass(/active-col/);
 
   await page.getByRole('button', { name: 'Reset' }).focus();
-  await expect(page.locator('.picross .active-row, .picross .active-col')).toHaveCount(0);
+  await expect(
+    page.locator('.picross .active-row, .picross .active-col'),
+  ).toHaveCount(0);
 });
 
 test('shows placeholders before completion and formatted solve times after completion', async ({
