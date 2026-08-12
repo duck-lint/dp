@@ -141,6 +141,20 @@ test('opens the daily puzzle and archive', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
 });
 
+test('falls back to the latest published puzzle when today is unpublished', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-20T12:00:00Z') });
+  await page.goto('/');
+  await expect(page.locator('.intro .muted')).toContainText('Archive puzzle');
+  await expect(
+    page.getByRole('heading', { name: /Aug 19, 2026/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'No puzzle published for this date' }),
+  ).toHaveCount(0);
+});
+
 test('rejects an incompatible persisted board before rendering the game', async ({
   page,
 }) => {
@@ -253,18 +267,155 @@ test('shows and clears a prominent wrong-guess penalty', async ({ page }) => {
   const penalty = page.getByRole('status').filter({ hasText: '-3:00' });
   await expect(penalty).toBeVisible();
   await expect(penalty.locator('strong')).toHaveText('-3:00');
-  const colors = await penalty.evaluate((element) => {
-    const styles = getComputedStyle(element);
-    return {
-      foreground: styles.color,
-      background: styles.backgroundColor,
-    };
-  });
-  expect(colors).toEqual({
-    foreground: 'rgb(255, 255, 255)',
-    background: 'rgb(163, 61, 80)',
-  });
+  await expect
+    .poll(() =>
+      penalty.evaluate((element) => {
+        const styles = getComputedStyle(element);
+        return {
+          foreground: styles.color,
+          background: styles.backgroundColor,
+        };
+      }),
+    )
+    .toEqual({
+      foreground: 'rgb(255, 255, 255)',
+      background: 'rgb(163, 61, 80)',
+    });
   await expect(penalty).toHaveCount(0, { timeout: 3000 });
+});
+
+test('marks a satisfied row reactively as its cells change', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const rowClue = page.getByTestId('row-clue-1');
+  await expect(rowClue).not.toHaveClass(/satisfied/);
+
+  for (const x of [6, 7, 8]) await page.getByTestId(`cell-1-${x}`).click();
+  await expect(rowClue).toHaveClass(/satisfied/);
+
+  await page.getByTestId('cell-1-7').click();
+  await expect(rowClue).not.toHaveClass(/satisfied/);
+});
+
+test('highlights the active row, column, and clue lines', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const active = page.getByTestId('cell-4-6');
+  const box = await active.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + 4, box!.y + 4);
+
+  await expect(active).toHaveClass(/active-row/);
+  await expect(active).toHaveClass(/active-col/);
+  await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-4-5')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-3-6')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-3-5')).not.toHaveClass(
+    /active-row|active-col/,
+  );
+
+  await page.mouse.move(4, 4);
+  await expect(
+    page.locator('.picross .active-row, .picross .active-col'),
+  ).toHaveCount(0);
+});
+
+test('preserves active projection through board rerenders', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const active = page.getByTestId('cell-4-6');
+  await active.hover();
+
+  await active.click();
+  await expect(active).toHaveClass(/active-row/);
+  await expect(active).toHaveClass(/active-col/);
+  await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-4-5')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-3-6')).toHaveClass(/active-col/);
+
+  await page.getByTestId('cell-4-7').hover();
+  await expect(page.getByTestId('cell-4-7')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-4-7')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('cell-4-6')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('cell-4-6')).not.toHaveClass(/active-col/);
+});
+
+test('keeps focus-visible distinct while keyboard navigation moves active lines', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  const focused = page.getByTestId('cell-4-6');
+  await focused.focus();
+
+  await expect(focused).toHaveClass(/active-row/);
+  await expect(focused).toHaveClass(/active-col/);
+  await expect(page.getByTestId('row-clue-4')).toHaveClass(/active-row/);
+  await expect(page.getByTestId('col-clue-6')).toHaveClass(/active-col/);
+  await expect
+    .poll(() =>
+      focused.evaluate((element) => getComputedStyle(element).outlineWidth),
+    )
+    .toBe('3px');
+  await expect
+    .poll(() =>
+      page
+        .getByTestId('cell-4-5')
+        .evaluate((element) => getComputedStyle(element).outlineWidth),
+    )
+    .toBe('2px');
+
+  await focused.press('ArrowRight');
+  const next = page.getByTestId('cell-4-7');
+  await expect(next).toBeFocused();
+  await expect(next).toHaveClass(/active-row/);
+  await expect(next).toHaveClass(/active-col/);
+  await expect(page.getByTestId('col-clue-7')).toHaveClass(/active-col/);
+  await expect(page.getByTestId('col-clue-6')).not.toHaveClass(/active-col/);
+
+  await page.getByRole('button', { name: 'Reset' }).focus();
+  await expect(
+    page.locator('.picross .active-row, .picross .active-col'),
+  ).toHaveCount(0);
+});
+
+test('shows placeholders before completion and formatted solve times after completion', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-08-08T12:00:00Z') });
+  await page.goto('/');
+  await expect(page.locator('.stats')).toContainText('—');
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'daily-picross:v1',
+      JSON.stringify({
+        theme: 'light',
+        puzzles: {},
+        completions: [
+          {
+            puzzleId: 'p-2026-08-06-r2',
+            date: '2026-08-06',
+            elapsedMs: 125000,
+          },
+          {
+            puzzleId: 'p-2026-08-07-r2',
+            date: '2026-08-07',
+            elapsedMs: 90000,
+          },
+        ],
+      }),
+    );
+  });
+  await page.reload();
+  await expect(page.locator('.stats')).toContainText('1:47');
+  await expect(page.locator('.stats')).toContainText('1:30');
 });
 
 test('keeps clue gutters contained and aligned with the board', async ({

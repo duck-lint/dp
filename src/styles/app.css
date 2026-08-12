@@ -181,6 +181,13 @@ header {
   line-height: 1.05;
   white-space: nowrap;
 }
+.clue-line.satisfied,
+.row-clues.satisfied {
+  opacity: 0.62;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+}
 .row-clues {
   height: var(--cell-size);
   width: var(--clue-width);
@@ -207,6 +214,22 @@ header {
 .cell:hover {
   border-color: var(--board-grid);
   background: transparent;
+}
+.picross .active-row.cell,
+.picross .active-col.cell {
+  outline: 2px solid #d59b38;
+  outline-offset: -2px;
+}
+.picross .cell:focus-visible {
+  outline: 3px solid #d59b38;
+  outline-offset: 2px;
+}
+.picross .active-row.row-clues,
+.picross .active-col.clue-line {
+  background: color-mix(in srgb, #d59b38 18%, transparent);
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-decoration-color: #d59b38;
 }
 .cell.filled {
   background: var(--accent);
@@ -356,7 +379,7 @@ header {
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.2rem 1rem;
   margin: 2rem 0;
   padding: 1.2rem;

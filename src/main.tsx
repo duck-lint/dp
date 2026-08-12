@@ -6,9 +6,9 @@ import React, {
   useState,
 } from 'react';
 import { createRoot } from 'react-dom/client';
-import { columnClues, rowClues } from './domain/clues';
+import { columnClues, lineSatisfied, rowClues } from './domain/clues';
 import { deriveAchievements } from './domain/achievements';
-import { localDateKey, formatDate } from './domain/dates';
+import { choosePuzzle, localDateKey, formatDate } from './domain/dates';
 import {
   applyCell,
   checkpointTimer,
@@ -20,9 +20,14 @@ import {
   type GameState,
   type MarkCommand,
   type Tool,
+  WRONG_MARK_PENALTY_MS,
 } from './domain/game-state';
 import { formatDuration } from './domain/format';
-import { isSolved, type PuzzleDefinition } from './domain/puzzle';
+import {
+  isSolved,
+  type CellState,
+  type PuzzleDefinition,
+} from './domain/puzzle';
 import { deriveStatistics } from './domain/statistics';
 import {
   emptySaved,
@@ -34,7 +39,7 @@ import { allPuzzles } from './puzzles';
 import './styles/app.css';
 
 const today = localDateKey();
-const current = allPuzzles.find((p) => p.publishDate === today);
+const current = choosePuzzle(allPuzzles, today);
 const empty = (p: PuzzleDefinition): GameState =>
   initialGame(p.width, p.height);
 const cycleTheme = (theme: SavedData['theme']): SavedData['theme'] =>
@@ -510,6 +515,16 @@ function App() {
             <span>current streak</span>
             <strong>{stats.bestStreak}</strong>
             <span>best streak</span>
+            <strong>
+              {stats.total ? formatDuration(stats.averageMs) : '—'}
+            </strong>
+            <span>average time</span>
+            <strong>
+              {stats.total && stats.fastestMs !== null
+                ? formatDuration(stats.fastestMs)
+                : '—'}
+            </strong>
+            <span>best time</span>
             <small className="stats-help">
               Streaks count consecutive published puzzle dates completed;
               solving an archive puzzle can repair a gap.
@@ -561,7 +576,7 @@ function PenaltyBadge() {
   return (
     <div className="penalty" role="status" aria-live="assertive">
       <span>Time penalty</span>
-      <strong>-3:00</strong>
+      <strong>-{formatDuration(WRONG_MARK_PENALTY_MS)}</strong>
     </div>
   );
 }
@@ -639,7 +654,12 @@ function Game({
   const rows = rowClues(puzzle.solution);
   const cols = columnClues(puzzle.solution);
   const [touchTool, setTouchTool] = useState<Tool>('fill');
+  const [activeCell, setActiveCell] = useState<{ y: number; x: number } | null>(
+    null,
+  );
   const drag = useRef<Drag | null>(null);
+  const asLine = (line: CellState[]): string[] =>
+    line.map((cell) => (cell === 'filled' ? '1' : '0'));
   useEffect(() => {
     const cancel = () => {
       drag.current = null;
@@ -771,7 +791,10 @@ function Game({
       </div>
       <div
         className="grid-wrap"
-        onPointerLeave={end}
+        onPointerLeave={() => {
+          end();
+          setActiveCell(null);
+        }}
         onPointerUp={end}
         onPointerCancel={end}
         onContextMenuCapture={(event) => event.preventDefault()}
@@ -796,7 +819,12 @@ function Game({
           <div className="corner" />
           <div className="col-clues">
             {cols.map((clue, x) => (
-              <div key={x} className="clue-line" data-testid={`col-clue-${x}`}>
+              <div
+                key={x}
+                className={`clue-line ${lineSatisfied(asLine(state.board.map((row) => row[x])), clue) ? 'satisfied' : ''} ${activeCell?.x === x ? 'active-col' : ''}`}
+                data-col={x}
+                data-testid={`col-clue-${x}`}
+              >
                 {clue.map((number, i) => (
                   <span key={i}>{number}</span>
                 ))}
@@ -805,17 +833,35 @@ function Game({
           </div>
           {rows.map((clue, y) => (
             <React.Fragment key={y}>
-              <div className="row-clues" data-testid={`row-clue-${y}`}>
+              <div
+                className={`row-clues ${lineSatisfied(asLine(state.board[y]), clue) ? 'satisfied' : ''} ${activeCell?.y === y ? 'active-row' : ''}`}
+                data-row={y}
+                data-testid={`row-clue-${y}`}
+              >
                 <span>{clue.join(' ')}</span>
               </div>
               {state.board[y].map((cell, x) => (
                 <button
                   key={x}
-                  className={`cell ${cell} ${(x + 1) % 5 === 0 ? 'major-x' : ''} ${(y + 1) % 5 === 0 ? 'major-y' : ''}`}
+                  className={`cell ${cell} ${activeCell?.y === y ? 'active-row' : ''} ${activeCell?.x === x ? 'active-col' : ''} ${(x + 1) % 5 === 0 ? 'major-x' : ''} ${(y + 1) % 5 === 0 ? 'major-y' : ''}`}
                   aria-label={`Row ${y + 1}, column ${x + 1}, ${cell}`}
                   data-testid={`cell-${y}-${x}`}
+                  data-col={x}
+                  data-row={y}
                   onPointerDown={(event) => begin(event, y, x)}
-                  onPointerEnter={() => enter(y, x)}
+                  onPointerEnter={() => {
+                    setActiveCell({ y, x });
+                    enter(y, x);
+                  }}
+                  onFocus={() => setActiveCell({ y, x })}
+                  onBlur={(event) => {
+                    if (
+                      !event.currentTarget.parentElement?.contains(
+                        event.relatedTarget as Node | null,
+                      )
+                    )
+                      setActiveCell(null);
+                  }}
                   onPointerUp={end}
                   onPointerCancel={end}
                   onContextMenu={(event) => event.preventDefault()}
